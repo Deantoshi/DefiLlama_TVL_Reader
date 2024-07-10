@@ -145,8 +145,6 @@ def try_to_make_protocol_df(protocol_name, chain_name, start_unix_timestamp):
 
     data = protocol_tvl_tracker(protocol_name)
 
-    print(data)
-
     data = filter_protocol_blockchain(data, chain_name)
 
     data = filter_start_date(data, start_unix_timestamp)
@@ -177,6 +175,7 @@ def run_all_protocol_tvl():
             df = try_to_make_protocol_df(protocol_name, chain_name, start_unix_timestamp)
         except:
             df = pd.DataFrame()
+            df_list.append(df)
         
         # # if the data exists defillama we will store this info
         if len(df) > 0:
@@ -194,37 +193,45 @@ def run_all_protocol_tvl():
         time.sleep(COOLDOWN_TIME)
 
         i += 1
-    
-    chain_df = pd.concat(df_list)
-
-    chain_df.rename(columns = {'totalLiquidityUSD':'tvl'}, inplace = True)
-
-    chain_df = find_tvl_start(chain_df, 'chain')
-
-    chain_df = find_tvl_current(chain_df, 'chain')
-
-    chain_df = find_tvl_delta(chain_df)
-
-    # # re-organizes our dataframe columns
-    chain_df = chain_df[['date', 'protocol', 'chain', 'tvl', 'tvl_start', 'tvl_current', 'tvl_delta']]
 
     current_day = str(date.today())
 
-    csv_name = 'protocol_level_tvl_' + current_day + '.csv'
+    # # will only save our csv if our run has any data in it
+    if len(df_list) > 0:
 
-    csv_name = csv_name.replace('-', '_')
+        chain_df = pd.concat(df_list)
 
-    chain_df.to_csv(csv_name, index=False)
+        chain_df.rename(columns = {'totalLiquidityUSD':'tvl'}, inplace = True)
 
-    # # will make a csv for protocol info that isn't available on defillama
-    missing_protocol_blockchain_df = pd.DataFrame()
-    missing_protocol_blockchain_df['protocol'] = no_defi_llama_protocol_name_list
-    missing_protocol_blockchain_df['chain'] = no_defi_llama_chain_name_list
-    missing_info_csv_name = 'missing_protocol_info_' + current_day + '.csv'
-    missing_info_csv_name = missing_info_csv_name.replace('-', '_')
-    missing_protocol_blockchain_df.to_csv(missing_info_csv_name, index=False)
+        chain_df = find_tvl_start(chain_df, 'chain')
 
-    return chain_df
+        chain_df = find_tvl_current(chain_df, 'chain')
+
+        chain_df = find_tvl_delta(chain_df)
+
+        # # re-organizes our dataframe columns
+        chain_df = chain_df[['date', 'protocol', 'chain', 'tvl', 'tvl_start', 'tvl_current', 'tvl_delta']]
+
+        csv_name = 'protocol_level_tvl_' + current_day + '.csv'
+
+        csv_name = csv_name.replace('-', '_')
+
+        chain_df.to_csv(csv_name, index=False)
+
+    # # will only make our missing protocol data csv if we defillama doesn't have any in our specified list
+    if len(no_defi_llama_protocol_name_list) > 0:
+        # # will make a csv for protocol info that isn't available on defillama
+        missing_protocol_blockchain_df = pd.DataFrame()
+        missing_protocol_blockchain_df['protocol'] = no_defi_llama_protocol_name_list
+        missing_protocol_blockchain_df['chain'] = no_defi_llama_chain_name_list
+        missing_info_csv_name = 'missing_protocol_info_' + current_day + '.csv'
+        missing_info_csv_name = missing_info_csv_name.replace('-', '_')
+        missing_protocol_blockchain_df.to_csv(missing_info_csv_name, index=False)
+    
+    try:
+        return chain_df
+    except:
+        return 'Protocol Data is Missing from DefiLlama'
 
 # chain_df = run_all_chain_tvl()
 # print(chain_df)
