@@ -212,7 +212,7 @@ def run_all_protocol_tvl():
         # # re-organizes our dataframe columns
         chain_df = chain_df[['date', 'protocol', 'chain', 'tvl', 'tvl_start', 'tvl_current', 'tvl_delta']]
 
-        csv_name = 'protocol_level_tvl_' + current_day + '.csv'
+        csv_name = current_day + '_protocol_level_tvl' + '.csv'
 
         csv_name = csv_name.replace('-', '_')
 
@@ -224,7 +224,7 @@ def run_all_protocol_tvl():
         missing_protocol_blockchain_df = pd.DataFrame()
         missing_protocol_blockchain_df['protocol'] = no_defi_llama_protocol_name_list
         missing_protocol_blockchain_df['chain'] = no_defi_llama_chain_name_list
-        missing_info_csv_name = 'missing_protocol_info_' + current_day + '.csv'
+        missing_info_csv_name = current_day + '_missing_protocol_info' + '.csv'
         missing_info_csv_name = missing_info_csv_name.replace('-', '_')
         missing_protocol_blockchain_df.to_csv(missing_info_csv_name, index=False)
     
