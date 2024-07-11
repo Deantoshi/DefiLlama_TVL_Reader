@@ -160,6 +160,8 @@ def run_all_protocol_tvl():
     
     start_unix_timestamp = get_utc_start_date()
 
+    start_unix_timestamp -= 30000
+
     df_list = []
     
     no_defi_llama_protocol_name_list = []
@@ -193,6 +195,7 @@ def run_all_protocol_tvl():
         time.sleep(COOLDOWN_TIME)
 
         i += 1
+        print('Protocols Scanned: ', i, '/', len(protocol_blockchain_legend))
 
     current_day = str(date.today())
 
@@ -233,10 +236,15 @@ def run_all_protocol_tvl():
     except:
         return 'Protocol Data is Missing from DefiLlama'
 
-# chain_df = run_all_chain_tvl()
-# print(chain_df)
+chain_df = run_all_chain_tvl()
+print('Chain TVL Stats')
+print(chain_df)
+
+print()
+print()
 
 protocol_df = run_all_protocol_tvl()
+print('Protocol TVL Stats')
 print(protocol_df)
 
 # chain_name = 'Renzo'
