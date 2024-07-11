@@ -1,6 +1,6 @@
 # Requirements
 ```
-1. Have python3 downloaded on machine
+1. Have python3 downloaded and installed on machine
 2. pip install -r requirements.txt
 ```
 
