@@ -3,12 +3,22 @@ import requests
 from datetime import datetime, timezone
 import time
 from datetime import date
+from pandas import json_normalize
+import numpy as np
 
 COOLDOWN_TIME = 1
+START_DATE = '2024-07-11'
 
-# # makes an api call to defillama to find the historic data for a given chain
-def chain_tvl_tracker(chain_name):
-    url = "https://api.llama.fi/v2/historicalChainTvl/" + chain_name
+def get_protocol_pool_config_df():
+
+    df = pd.read_csv('protocol_pool.csv')
+
+    return df
+
+# # given a pool id, returns it's historic tvl and yield
+def get_historic_protocol_pool_tvl_and_yield(pool_id):
+    
+    url = "https://yields.llama.fi/chart/" + pool_id
 
     # Send a GET request to the URL
     response = requests.get(url)
@@ -24,9 +34,9 @@ def chain_tvl_tracker(chain_name):
 
     return data
 
-def protocol_tvl_tracker(protocol_name):
-    
-    url = "https://api.llama.fi/protocol/" + protocol_name
+
+def get_historic_protocol_tvl_json(protocol_slug):
+    url = "https://api.llama.fi/protocol/" + protocol_slug
 
     # Send a GET request to the URL
     response = requests.get(url)
@@ -42,226 +52,246 @@ def protocol_tvl_tracker(protocol_name):
 
     return data
 
-# # will only return data for our specific protocol's blockchain
-def filter_protocol_blockchain(data, blockchain):
-    
-    filtered_data = data['chainTvls'].get(blockchain, [])
-    
-    return filtered_data
+# # makes a dataframe for our usd_supplied amounts
+def get_historic_protocol_tvl_df(data, blockchain, category):
+    # Extract the tokensInUsd list
+    tokens_in_usd = data['chainTvls'][blockchain][category]
+    # tokens_in_usd = data['chainTvls'][blockchain]['tokensInUsd']
 
-def get_utc_start_date():
+    # Create a list of dictionaries with the correct structure
+    formatted_data = [
+        {
+            'date': entry['date'],
+            **entry['tokens']  # Unpack the tokens dictionary
+        }
+        for entry in tokens_in_usd
+    ]
+
+    # Create DataFrame directly from the formatted data
+    df = pd.DataFrame(formatted_data)
+
+    # Ensure 'date' is the first column
+    columns = ['date'] + [col for col in df.columns if col != 'date']
+    df = df[columns]
+
+    # Sort the DataFrame by date
+    df = df.sort_values('date')
+
+    # Reset the index to have a standard numeric index
+    df = df.reset_index(drop=True)
+
+    df.rename(columns = {'date':'timestamp'}, inplace = True)
+
+    # df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+    return df
+
+# # simply turns our dataframe into a df adn goes ahead and casts our timestamp into a datetime data type
+def turn_json_into_df(data):
+
+    df = pd.DataFrame(data['data'])
+    # Convert timestamp to datetime
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df['tvlUsd'] = df['tvlUsd'].astype('float')
+
+    df = df[['timestamp', 'tvlUsd', 'apy']]
+
+    return df
+
+def get_utc_start_day():
     # Create a datetime object for July 7th, 2024, at 00:00:00 UTC
-    date = datetime(2024, 7, 8, 0, 0, 0, tzinfo=timezone.utc)
+    date = datetime(2024, 7, 10, 0, 0, 0, tzinfo=timezone.utc)
 
-    # Convert to Unix timestamp
-    unix_timestamp = int(date.timestamp())
+    return date
 
+# # date string into unix timestamp
+def date_to_unix_timestamp(date_string, format="%Y-%m-%d"):
+    # Convert string to datetime object
+    date_object = datetime.strptime(date_string, format)
+    
+    # Convert datetime object to Unix timestamp
+    unix_timestamp = int(time.mktime(date_object.timetuple()))
+    
     return unix_timestamp
 
-def filter_start_date(data, start_unix_timestamp):
 
-    try:
-        filtered_data = [item for item in data if item['date'] >= start_unix_timestamp]
-    except:
-        filtered_data = [item for item in data['tvl'] if item['date'] > start_unix_timestamp]
+# # only returns items that are greater than a certain day
+def filter_start_timestamp(df, start_day):
+
+    df = df.loc[df['timestamp'] >= start_day]
     
-    return filtered_data
+    return df
 
-# # finds the tvl at the start
-def find_tvl_start(df, category_column_name):
-    unique_category_list = df[category_column_name].unique()
+# # gives the tvl at the beginning of our tracking
+def get_start_tvl(df):
 
-    for unique_category in unique_category_list:
-        temp_df = df.loc[df[category_column_name] == unique_category]
+    temp_df = df.loc[df['timestamp'] == df['timestamp'].min()]
 
-        tvl_start = temp_df['tvl'].min()
+    start_tvl = temp_df['tvlUsd'].min()
 
-        df.loc[df[category_column_name] == unique_category, 'tvl_start'] = tvl_start
+    df['start_tvl'] = start_tvl
 
     return df
 
-# # finds the current tvl
-def find_tvl_current(df, category_column_name):
-    unique_category_list = df[category_column_name].unique()
+def get_tvl_change_since_start(df):
 
-    for unique_category in unique_category_list:
-        temp_df = df.loc[df[category_column_name] == unique_category]
-
-        temp_df = temp_df.loc[temp_df['date'] == temp_df['date'].max()]
-
-        tvl_current = temp_df['tvl'].min()
-
-        df.loc[df[category_column_name] == unique_category, 'tvl_current'] = tvl_current
+    df['change_in_tvl'] = df['tvlUsd'] - df['start_tvl']
 
     return df
 
-# # finds the current tvl
-def find_tvl_delta(df):
+def run_all_apy():
 
-    df['tvl_delta'] = df['tvl_current'] - df['tvl_start']
+    pool_df = get_protocol_pool_config_df()
 
-    return df
-
-# # will run the tvl tracker for all of our superfest chains
-def run_all_chain_tvl():
-    chain_list = ['Base', 'Fraxtal','Mode','Optimism']
-    
-    start_unix_timestamp = get_utc_start_date()
+    pool_id_list = pool_df['pool_id'].unique()
 
     df_list = []
 
-    for chain_name in chain_list:
-        data = chain_tvl_tracker(chain_name)
-        data = filter_start_date(data, start_unix_timestamp)
-        
-        df = pd.DataFrame(data)
-        df['date'] = pd.to_datetime(df['date'], unit='s')
-        df['chain'] = chain_name
+    for pool_id in pool_id_list:
 
+        data = get_historic_protocol_pool_tvl_and_yield(pool_id)
+        df = turn_json_into_df(data)
+        start_day = get_utc_start_day()
+        df = filter_start_timestamp(df, start_day)
+        df = get_start_tvl(df)
+        df = get_tvl_change_since_start(df)
         df_list.append(df)
-
-        time.sleep(COOLDOWN_TIME)
     
-    chain_df = pd.concat(df_list)
-
-    chain_df = find_tvl_start(chain_df, 'chain')
-
-    chain_df = find_tvl_current(chain_df, 'chain')
-
-    chain_df = find_tvl_delta(chain_df)
-
-    current_day = str(date.today())
-
-    csv_name = 'blockchain_level_tvl_' + current_day + '.csv'
-
-    csv_name = csv_name.replace('-', '_')
-
-    chain_df.to_csv(csv_name, index=False)
-
-    return chain_df
-
-# # will try to make a dataframe for our project
-def try_to_make_protocol_df(protocol_name, chain_name, start_unix_timestamp):
-
-    data = protocol_tvl_tracker(protocol_name)
-
-    data = filter_protocol_blockchain(data, chain_name)
-
-    data = filter_start_date(data, start_unix_timestamp)
-    
-    df = pd.DataFrame(data)
+    df = pd.concat(df_list)
 
     return df
 
-# # will run the tvl tracker for all of our superfest chains
-def run_all_protocol_tvl():
 
-    protocol_blockchain_legend = pd.read_csv('protocol_blockchain_legend.csv')
-    
-    start_unix_timestamp = get_utc_start_date()
+# # will manage pinging our api for us and making a subsequent df
+def get_pool_type_df(data, protocol_blockchain, pool_type):
 
-    start_unix_timestamp -= 30000
+    df = pd.DataFrame()
+
+    # # if it is a supply pool, then we make sure to add borrows to it to get a better total market size
+    if pool_type == 'supply':
+        category = 'tokensInUsd'
+        df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+        pool_type = 'borrow'
+        protocol_blockchain += '-borrowed'
+        borrow_df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+
+        df = add_dataframes(df, borrow_df)
+
+    elif pool_type == 'borrow':
+        protocol_blockchain += '-borrowed'
+        df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+
+    return df
+
+# # divides our dataframe columns to essentially find the token prices
+def divide_dataframes(df_top, df_bottom):
+    # Ensure both dataframes have the same index
+    df_top = df_top.set_index('timestamp')
+    df_bottom = df_bottom.set_index('timestamp')
+
+    # List of token columns (excluding 'timestamp' and 'pool_type')
+    token_columns = [col for col in df_bottom.columns if col not in ['timestamp', 'pool_type']]
+
+    # Perform element-wise division
+    result = df_top[token_columns] / df_bottom[token_columns]
+
+    # Reset the index to make 'timestamp' a column again
+    result = result.reset_index()
+
+    return result
+
+# # adds our two dataframes together
+def add_dataframes(df1, df2):
+    # Ensure both dataframes have the same index
+    df1 = df1.set_index('timestamp')
+    df2 = df2.set_index('timestamp')
+
+    # List of token columns (excluding 'timestamp')
+    token_columns = [col for col in df1.columns if col != 'timestamp']
+
+    # Add the dataframes
+    result = df1[token_columns].add(df2[token_columns], fill_value=0)
+
+    # Reset the index to make 'timestamp' a column again
+    result = result.reset_index()
+
+    return result
+
+# # will the first numeric tvl for each token as their own columns
+def add_min_token_columns(df):
+    # List of token columns (excluding 'timestamp' and 'pool_type')
+    token_columns = [col for col in df.columns if col not in ['timestamp', 'pool_type']]
+
+    # Find the first non-NaN value for each token column
+    min_values = df[token_columns].apply(lambda x: x.dropna().iloc[0] if not x.dropna().empty else np.nan)
+
+    # Create new columns with the minimum values
+    for col in token_columns:
+        df[f'min_{col}'] = min_values[col]
+
+    return df
+
+# # will return the price per token from usd amount / quantity amount
+def find_token_prices(usd_df, data, protocol_blockchain):
+
+    category = 'tokens'
+    quantity_df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+    start_unix = int(date_to_unix_timestamp(START_DATE))
+
+    quantity_df = filter_start_timestamp(quantity_df, start_unix)
+
+    df = divide_dataframes(usd_df, quantity_df)
+
+    return df
+
+def run_all():
+    protocol_df = get_protocol_pool_config_df()
+    protocol_slug_list = protocol_df['protocol_slug'].tolist()
+    protocol_blockchain_list = protocol_df['chain'].tolist()
+    pool_type_list = protocol_df['pool_type'].tolist()
+    token_list = protocol_df['token'].tolist()
 
     df_list = []
-    
-    no_defi_llama_protocol_name_list = []
-    no_defi_llama_chain_name_list = []
 
+    start_unix = int(date_to_unix_timestamp(START_DATE))
+
+    last_slug = ''
+    last_token = ''
+    last_pool_type = ''
     i = 0
 
-    while i < len(protocol_blockchain_legend):
-        protocol_name = protocol_blockchain_legend['protocol'][i]
-        chain_name = protocol_blockchain_legend['chain'][i]
-        
-        try:
-            df = try_to_make_protocol_df(protocol_name, chain_name, start_unix_timestamp)
-        except:
-            df = pd.DataFrame()
-            df_list.append(df)
-        
-        # # if the data exists defillama we will store this info
-        if len(df) > 0:
-            df['date'] = pd.to_datetime(df['date'], unit='s')
-            df['chain'] = chain_name
-            df['protocol'] = protocol_name
+    while i < len(protocol_slug_list):
+
+        protocol_slug = protocol_slug_list[i]
+        protocol_blockchain = protocol_blockchain_list[i]
+        pool_type = pool_type_list[i]
+        token = token_list[i]
+
+        # # we will only send another api ping if we are using a new slug
+        if (last_slug != protocol_slug) and (last_pool_type != pool_type):
+            data = get_historic_protocol_tvl_json(protocol_slug)
+
+            df = get_pool_type_df(data, protocol_blockchain, pool_type)
+
+            df = filter_start_timestamp(df, start_unix)
+            df['pool_type'] = pool_type
+            df = add_min_token_columns(df)
 
             df_list.append(df)
         
-        # # if the data DOES NOT exist in defillama, we will take note of the protocol name and the blockchain name combo of each to return later
         else:
-            no_defi_llama_protocol_name_list.append(protocol_name)
-            no_defi_llama_chain_name_list.append(chain_name)
+            continue
 
-        time.sleep(COOLDOWN_TIME)
+        # # updates our last known values to reduce api calls and computation needs
+        last_slug = protocol_slug
+        last_pool_type = pool_type
 
         i += 1
-        print('Protocols Scanned: ', i, '/', len(protocol_blockchain_legend))
 
-    current_day = str(date.today())
+    df = pd.concat(df_list)
 
-    # # will only save our csv if our run has any data in it
-    if len(df_list) > 0:
+    return df
 
-        chain_df = pd.concat(df_list)
+df = run_all()
 
-        chain_df.rename(columns = {'totalLiquidityUSD':'tvl'}, inplace = True)
-
-        chain_df = find_tvl_start(chain_df, 'chain')
-
-        chain_df = find_tvl_current(chain_df, 'chain')
-
-        chain_df = find_tvl_delta(chain_df)
-
-        # # re-organizes our dataframe columns
-        chain_df = chain_df[['date', 'protocol', 'chain', 'tvl', 'tvl_start', 'tvl_current', 'tvl_delta']]
-
-        csv_name = current_day + '_protocol_level_tvl' + '.csv'
-
-        csv_name = csv_name.replace('-', '_')
-
-        chain_df.to_csv(csv_name, index=False)
-
-    # # will only make our missing protocol data csv if we defillama doesn't have any in our specified list
-    if len(no_defi_llama_protocol_name_list) > 0:
-        # # will make a csv for protocol info that isn't available on defillama
-        missing_protocol_blockchain_df = pd.DataFrame()
-        missing_protocol_blockchain_df['protocol'] = no_defi_llama_protocol_name_list
-        missing_protocol_blockchain_df['chain'] = no_defi_llama_chain_name_list
-        missing_info_csv_name = current_day + '_missing_protocol_info' + '.csv'
-        missing_info_csv_name = missing_info_csv_name.replace('-', '_')
-        missing_protocol_blockchain_df.to_csv(missing_info_csv_name, index=False)
-    
-    try:
-        return chain_df
-    except:
-        return 'Protocol Data is Missing from DefiLlama'
-
-chain_df = run_all_chain_tvl()
-print('Chain TVL Stats')
-print(chain_df)
-
-print()
-print()
-
-protocol_df = run_all_protocol_tvl()
-print('Protocol TVL Stats')
-print(protocol_df)
-
-# chain_name = 'Renzo'
-# blockchain = 'Base'
-
-# start_unix_timestamp = get_utc_start_date()
-
-# data = protocol_tvl_tracker(chain_name)
-
-# data = filter_protocol_blockchain(data, blockchain)
-
-# data = filter_start_date(data, start_unix_timestamp)
-
-# df = pd.DataFrame(data)
-# df['date'] = pd.to_datetime(df['date'], unit='s')
-
-# df.rename(columns = {'totalLiquidityUSD':'tvl'}, inplace = True)
-
-# print(df)
-
+print(df)

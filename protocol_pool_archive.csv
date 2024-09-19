@@ -1,0 +1,5 @@
+chain,platform,segment,partner,pool_name,pool_id
+Base,Aave,Lending,EtherFi,Aave_Base_weETH_Supply
+Base,Aave,Lending,Aave,Aave_Base_wETH_Borrow
+Base,Aave,Lending,Aave,Aave_Base_wETH_Supply
+OP,Silo,Lending,Silo,Silo_Optimism_WETH_Supply_on_ezETH_Market
