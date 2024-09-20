@@ -242,17 +242,24 @@ def transpose_df(df):
 
     return df
 
-# # will the first numeric tvl for each token as their own columns
-def add_min_token_columns(df):
-    # List of token columns (excluding 'timestamp' and 'pool_type')
-    token_columns = [col for col in df.columns if col not in ['timestamp', 'pool_type']]
+# Define a function to get the first non-NaN value
+def first_valid(series):
+    return series.dropna().iloc[0] if not series.dropna().empty else np.nan
 
-    # Find the first non-NaN value for each token column
-    min_values = df[token_columns].apply(lambda x: x.dropna().iloc[0] if not x.dropna().empty else np.nan)
+# # makes a new column for the starting_token_amount
+def add_start_token_amount_column(df):
 
-    # Create new columns with the minimum values
-    for col in token_columns:
-        df[f'start_{col}'] = min_values[col]
+    # Create the start_token_amount column
+    df['start_token_amount'] = df.groupby(['token', 'pool_type'])['token_amount'].transform(first_valid)
+
+    # Fill NaN values with 0 in the entire DataFrame
+    df = df.fillna(0)
+
+    # Sort the DataFrame by timestamp, token, and pool_type for better readability
+    df = df.sort_values(['timestamp', 'token', 'pool_type'])
+
+    # Reset the index
+    df = df.reset_index(drop=True)
 
     return df
 
@@ -307,7 +314,7 @@ def run_all():
             df = filter_start_timestamp(df, start_unix)
             df['pool_type'] = pool_type
             df = transpose_df(df)
-            # df = add_min_token_columns(df)
+            df = add_start_token_amount_column(df)
 
             df_list.append(df)
         
@@ -327,3 +334,5 @@ def run_all():
 df = run_all()
 
 print(df)
+
+df.to_csv('test_test.csv', index=False)
