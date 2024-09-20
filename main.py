@@ -178,6 +178,7 @@ def get_pool_type_df(data, protocol_blockchain, pool_type):
         df = add_dataframes(df, borrow_df)
 
     elif pool_type == 'borrow':
+        category = 'tokensInUsd'
         protocol_blockchain += '-borrowed'
         df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
 
@@ -217,6 +218,30 @@ def add_dataframes(df1, df2):
 
     return result
 
+# # transposes our token columns
+def transpose_df(df):
+    token_columns = [col for col in df.columns if col not in ['timestamp', 'pool_type']]
+
+    # Melt the DataFrame
+    df_melted = pd.melt(df, 
+                        id_vars=['timestamp', 'pool_type'],
+                        value_vars=token_columns,
+                        var_name='token',
+                        value_name='token_amount')
+
+    # Reorder columns
+    df_melted = df_melted[['timestamp', 'token', 'token_amount', 'pool_type']]
+
+    # Sort by timestamp and token
+    df_melted = df_melted.sort_values(['timestamp', 'token'])
+
+    # Reset index
+    df_melted = df_melted.reset_index(drop=True)
+
+    df = df_melted
+
+    return df
+
 # # will the first numeric tvl for each token as their own columns
 def add_min_token_columns(df):
     # List of token columns (excluding 'timestamp' and 'pool_type')
@@ -227,7 +252,7 @@ def add_min_token_columns(df):
 
     # Create new columns with the minimum values
     for col in token_columns:
-        df[f'min_{col}'] = min_values[col]
+        df[f'start_{col}'] = min_values[col]
 
     return df
 
@@ -262,25 +287,32 @@ def run_all():
 
     while i < len(protocol_slug_list):
 
+        if i == 1:
+            print('borrow time')
+
         protocol_slug = protocol_slug_list[i]
         protocol_blockchain = protocol_blockchain_list[i]
         pool_type = pool_type_list[i]
         token = token_list[i]
 
         # # we will only send another api ping if we are using a new slug
-        if (last_slug != protocol_slug) and (last_pool_type != pool_type):
+        if last_slug != protocol_slug:
             data = get_historic_protocol_tvl_json(protocol_slug)
+        else:
+            pass
 
+        if last_pool_type != pool_type:
             df = get_pool_type_df(data, protocol_blockchain, pool_type)
 
             df = filter_start_timestamp(df, start_unix)
             df['pool_type'] = pool_type
-            df = add_min_token_columns(df)
+            df = transpose_df(df)
+            # df = add_min_token_columns(df)
 
             df_list.append(df)
         
         else:
-            continue
+            pass
 
         # # updates our last known values to reduce api calls and computation needs
         last_slug = protocol_slug

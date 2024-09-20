@@ -1,2 +1,3 @@
 chain,platform,segment,partner,token,pool_type,protocol_slug
 Mode,Ironclad,Lending,Ironclad,weth,supply,ironclad-finance
+Mode,Ironclad,Lending,Ironclad,weth,borrow,ironclad-finance
