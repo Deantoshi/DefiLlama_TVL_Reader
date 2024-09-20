@@ -263,6 +263,16 @@ def add_start_token_amount_column(df):
 
     return df
 
+def add_change_in_token_amounts(df):
+
+    df['raw_change_in_usd'] = df['token_amount'] - df['start_token_amount']
+    df['percentage_change_in_usd'] = (df['token_amount'] / df['start_token_amount'] - 1)
+
+    # Fill NaN values with 0 in the entire DataFrame
+    df = df.fillna(0)
+                   
+    return df
+
 # # will return the price per token from usd amount / quantity amount
 def find_token_prices(usd_df, data, protocol_blockchain):
 
@@ -315,7 +325,7 @@ def run_all():
             df['pool_type'] = pool_type
             df = transpose_df(df)
             df = add_start_token_amount_column(df)
-
+            df = add_change_in_token_amounts(df)
             df_list.append(df)
         
         else:
