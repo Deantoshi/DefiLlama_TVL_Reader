@@ -312,6 +312,26 @@ def find_tvl_over_time(df):
 
     return df
 
+# # will only return rows for tokens specified in our protocol_pool.csv file for our desired protocol
+def df_token_cleanup(protocol_df, df):
+
+    unique_slugs = protocol_df['protocol_slug'].unique()
+
+    df_list = []
+
+    for unique_slug in unique_slugs:
+        temp_df = df.loc[df['protocol'] == unique_slug]
+        temp_protocol_df = protocol_df.loc[protocol_df['protocol_slug'] == unique_slug]
+        unique_protocol_tokens = temp_protocol_df['token'].unique()
+
+        temp_df = temp_df.loc[temp_df['token'].isin(unique_protocol_tokens)]
+
+        df_list.append(temp_df)
+
+    df = pd.concat(df_list)
+
+    return df
+
 def run_all():
     protocol_df = get_protocol_pool_config_df()
     protocol_slug_list = protocol_df['protocol_slug'].tolist()
@@ -338,28 +358,35 @@ def run_all():
         pool_type = pool_type_list[i]
         token = token_list[i]
 
+        if protocol_slug == 'silo-finance':
+            print('silo')
+
         # # we will only send another api ping if we are using a new slug
         if last_slug != protocol_slug:
             data = get_historic_protocol_tvl_json(protocol_slug)
-        else:
-            pass
-
-        if last_pool_type != pool_type:
-            df = get_pool_type_df(data, protocol_blockchain, pool_type)
-
-            df = filter_start_timestamp(df, start_unix)
-            df['pool_type'] = pool_type
-            df = transpose_df(df)
-            df = add_start_token_amount_column(df)
-            df = add_change_in_token_amounts(df)
-
-            df.rename(columns = {'token_amount':'token_usd_amount', 'start_token_amount': 'start_token_usd_amount'}, inplace = True)
-
-            df = find_tvl_over_time(df)
-            df_list.append(df)
         
         else:
             pass
+
+        # if last_pool_type != pool_type:
+        df = get_pool_type_df(data, protocol_blockchain, pool_type)
+
+        df = filter_start_timestamp(df, start_unix)
+        df['pool_type'] = pool_type
+        df = transpose_df(df)
+        df = add_start_token_amount_column(df)
+        df = add_change_in_token_amounts(df)
+
+        df.rename(columns = {'token_amount':'token_usd_amount', 'start_token_amount': 'start_token_usd_amount'}, inplace = True)
+
+        df = find_tvl_over_time(df)
+
+        df['protocol'] = protocol_slug
+
+        df_list.append(df)
+        
+        # else:
+        #     pass
 
         # # updates our last known values to reduce api calls and computation needs
         last_slug = protocol_slug
@@ -368,6 +395,10 @@ def run_all():
         i += 1
 
     df = pd.concat(df_list)
+
+    print(df)
+
+    df = df_token_cleanup(protocol_df, df)
 
     return df
 
