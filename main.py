@@ -6,8 +6,10 @@ from datetime import date
 from pandas import json_normalize
 import numpy as np
 
-COOLDOWN_TIME = 1
-START_DATE = '2024-07-11'
+COOLDOWN_TIME = 1.5
+START_DATE = '2024-07-08'
+PRICE_BLOCKCHAIN = 'optimism'
+OPTIMISM_TOKEN_ADDRESS = '0x4200000000000000000000000000000000000042'
 
 def get_protocol_pool_config_df():
 
@@ -364,6 +366,7 @@ def run_all():
         # # we will only send another api ping if we are using a new slug
         if last_slug != protocol_slug:
             data = get_historic_protocol_tvl_json(protocol_slug)
+            time.sleep(COOLDOWN_TIME)
         
         else:
             pass
@@ -402,8 +405,89 @@ def run_all():
 
     return df
 
-df = run_all()
+# df = run_all()
 
-print(df)
+# print(df)
 
-df.to_csv('test_test.csv', index=False)
+# df.to_csv('test_test.csv', index=False)
+
+# # gets our incentive history
+def get_protocol_incentives_df():
+
+    df = pd.read_csv('protocol_incentive_history.csv')
+    return df
+
+# Function to create new rows with incremented dates
+def expand_rows(row):
+    new_rows = [row.copy() for _ in range(7)]  # Create 7 copies (original + 6 new)
+    for i in range(1, 7):
+        new_rows[i]['date'] = row['date'] + pd.Timedelta(days=i)
+    return pd.DataFrame(new_rows)
+
+# # takes in a dataframe, and evenly distributes incentives accross the next 7 days
+def fill_incentive_days(df):
+    df['incentives_per_day'] = df['epoch_token_incentives'] / 7
+
+    df['date'] = pd.to_datetime(df['date'])
+
+    # Apply the function to each row and concatenate the results
+    expanded_df = pd.concat([expand_rows(row) for _, row in df.iterrows()], ignore_index=True)
+
+    # Sort the dataframe by date and other relevant columns if needed
+    expanded_df = expanded_df.sort_values(['date', 'chain', 'platform', 'token', 'pool_type'])
+
+    # Reset the index
+    expanded_df = expanded_df.reset_index(drop=True)
+
+    df = expanded_df
+    
+    return df
+
+# # makes a unix timestamp column for our incentives
+def get_incentives_unix_timestamps(df):
+    df['timestamp'] = df['date'].apply(lambda x: pd.Timestamp(x).timestamp())
+
+    df['timestamp'] = df['timestamp'].astype(int)
+    return df
+
+# # will use the defillama price api to get the price of our token over time
+# # returns a list of jsons
+def get_token_price_json_list(df, blockchain, token_address):
+    url = "https://coins.llama.fi/batchHistorical?coins=%7B%22optimism:0x4200000000000000000000000000000000000042%22:%20%5B1666876743,%201666862343%5D%7D&searchWidth=600"
+    url = "https://coins.llama.fi/batchHistorical?coins=%7B%22optimism:0x4200000000000000000000000000000000000042%22:%20%5B1686876743,%201686862343%5D%7D&searchWidth=600"
+
+    unique_incentive_timestamps = df['timestamp'].unique()
+
+    data_list = []
+
+    for unique_incentive_timestamp in unique_incentive_timestamps:
+
+        start_timestamp = unique_incentive_timestamp
+        end_timestamp = start_timestamp + 14400
+
+        url = "https://coins.llama.fi/batchHistorical?coins=%7B%22" + blockchain + ":" + token_address + "%22:%20%5B" + str(start_timestamp) + ",%20" + str(end_timestamp) + "%5D%7D&searchWidth=600"
+
+        # Send a GET request to the URL
+        response = requests.get(url)
+
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Request was successful
+            data = response.json()  # Parse the JSON response
+            data_list.append(data)
+        else:
+            # Request failed
+            print(f"Request failed with status code: {response.status_code}")
+            print(response.text)  # Print the response content for more info on the error
+
+        time.sleep(COOLDOWN_TIME)
+
+    return data_list
+
+df = get_protocol_incentives_df()
+df = fill_incentive_days(df)
+df = get_incentives_unix_timestamps(df)
+data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, OPTIMISM_TOKEN_ADDRESS)
+print(data_list[0])
+
+# df.to_csv('test_test.csv', index=False)
