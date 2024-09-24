@@ -5,6 +5,7 @@ import time
 from datetime import date
 from pandas import json_normalize
 import numpy as np
+import json
 
 COOLDOWN_TIME = 1.5
 START_DATE = '2024-07-08'
@@ -484,10 +485,57 @@ def get_token_price_json_list(df, blockchain, token_address):
 
     return data_list
 
+# # makes a dataframe representation of our historic pricing info
+def make_prices_df(data_list):
+
+    df_list = []
+    for data_json in data_list:
+        # Extract the relevant data
+        coin_data = list(data_json['coins'].values())[0]
+        symbol = coin_data['symbol']
+        prices = coin_data['prices']
+
+        # Create DataFrame
+        df = pd.DataFrame(prices)      
+
+        # Add symbol column
+        df['symbol'] = symbol          
+
+        # Reorder columns if desired
+        df = df[['symbol', 'timestamp', 'price']]   
+        df['price'] = df['price'].mean()
+
+        df = df.iloc[0:1]
+        df_list.append(df)
+    
+    df = pd.concat(df_list)
+
+    return df
+
+# # takes in our incentives_per_day_df + incentives_timeseries_price_df
+# # returns incentives_per_day_df with a new incentives_per_day_usd column that is the incentives_per day quantity * price
+def find_daily_incentives_usd(incentives_per_day_df, incentives_timeseries_price_df):
+
+    incentives_per_day_df = incentives_per_day_df.sort_values(by='timestamp')
+    incentives_timeseries_price_df = incentives_timeseries_price_df.sort_values(by='timestamp')
+
+    incentive_token_price_list = incentives_timeseries_price_df['price'].tolist()
+
+    incentives_per_day_df['incentive_token_price'] = incentive_token_price_list
+
+    incentives_per_day_df['incentives_per_day_usd'] = incentives_per_day_df['incentives_per_day'] * incentives_per_day_df['incentive_token_price']
+
+    return incentives_per_day_df
+
 df = get_protocol_incentives_df()
 df = fill_incentive_days(df)
 df = get_incentives_unix_timestamps(df)
 data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, OPTIMISM_TOKEN_ADDRESS)
-print(data_list[0])
 
-# df.to_csv('test_test.csv', index=False)
+incentives_timeseries_price_df = make_prices_df(data_list)
+
+df = find_daily_incentives_usd(df, incentives_timeseries_price_df)
+
+print(df)
+
+df.to_csv('test_test.csv', index=False)
