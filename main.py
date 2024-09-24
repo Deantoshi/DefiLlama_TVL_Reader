@@ -209,6 +209,14 @@ def add_dataframes(df1, df2):
 
     # List of token columns (excluding 'timestamp')
     token_columns = [col for col in df1.columns if col != 'timestamp']
+    token_columns_2 = [col for col in df2.columns if col != 'timestamp']
+
+    # # shared token columns
+    token_columns = list(set(token_columns) & set(token_columns_2))
+
+    df1 = df1[token_columns]
+    df2 = df2[token_columns]
+
 
     # Add the dataframes
     result = df1[token_columns].add(df2[token_columns], fill_value=0)
@@ -286,6 +294,24 @@ def find_token_prices(usd_df, data, protocol_blockchain):
 
     return df
 
+# # finds tvl over time for each asset supply and borrow side
+def find_tvl_over_time(df):
+    # Convert timestamp to datetime
+    df['date'] = pd.to_datetime(df['timestamp'], unit='s').dt.date
+
+    # Group by date and pool_type, then sum token_usd_amount
+    grouped_df = df.groupby(['date', 'pool_type'])['token_usd_amount'].sum().reset_index()
+
+    # Rename the token_usd_amount column to daily_tvl
+    grouped_df = grouped_df.rename(columns={'token_usd_amount': 'daily_tvl'})
+
+    # Merge the daily_tvl back to the original dataframe
+    df = df.merge(grouped_df[['date', 'pool_type', 'daily_tvl']], on=['date', 'pool_type'], how='left')
+
+    df = df[['timestamp', 'date', 'token', 'pool_type', 'token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'daily_tvl']]
+
+    return df
+
 def run_all():
     protocol_df = get_protocol_pool_config_df()
     protocol_slug_list = protocol_df['protocol_slug'].tolist()
@@ -326,6 +352,10 @@ def run_all():
             df = transpose_df(df)
             df = add_start_token_amount_column(df)
             df = add_change_in_token_amounts(df)
+
+            df.rename(columns = {'token_amount':'token_usd_amount', 'start_token_amount': 'start_token_usd_amount'}, inplace = True)
+
+            df = find_tvl_over_time(df)
             df_list.append(df)
         
         else:
