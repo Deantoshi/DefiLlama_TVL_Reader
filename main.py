@@ -519,11 +519,19 @@ def find_daily_incentives_usd(incentives_per_day_df, incentives_timeseries_price
     incentives_per_day_df = incentives_per_day_df.sort_values(by='timestamp')
     incentives_timeseries_price_df = incentives_timeseries_price_df.sort_values(by='timestamp')
 
-    incentive_token_price_list = incentives_timeseries_price_df['price'].tolist()
+    incentives_per_day_df['timestamp'] = incentives_per_day_df['timestamp'].astype(int)
+    incentives_timeseries_price_df['timestamp'] = incentives_timeseries_price_df['timestamp'].astype(int)
+    
+    # Perform the merge_asof operation
+    df_result = pd.merge_asof(incentives_per_day_df, incentives_timeseries_price_df[['timestamp', 'price']], 
+                            on='timestamp', 
+                            direction='nearest')
+    
+    # If you want to keep the original df_1 and just add the new 'price' column:
+    incentives_per_day_df['price'] = df_result['price']
 
-    incentives_per_day_df['incentive_token_price'] = incentive_token_price_list
 
-    incentives_per_day_df['incentives_per_day_usd'] = incentives_per_day_df['incentives_per_day'] * incentives_per_day_df['incentive_token_price']
+    incentives_per_day_df['incentives_per_day_usd'] = incentives_per_day_df['incentives_per_day'] * incentives_per_day_df['price']
 
     return incentives_per_day_df
 
