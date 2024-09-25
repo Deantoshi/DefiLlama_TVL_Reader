@@ -11,6 +11,7 @@ COOLDOWN_TIME = 1.5
 START_DATE = '2024-07-08'
 PRICE_BLOCKCHAIN = 'optimism'
 OPTIMISM_TOKEN_ADDRESS = '0x4200000000000000000000000000000000000042'
+WETH_TOKEN_ADDRESS = '0x4200000000000000000000000000000000000006'
 
 def get_protocol_pool_config_df():
 
@@ -335,83 +336,6 @@ def df_token_cleanup(protocol_df, df):
 
     return df
 
-def run_all():
-    protocol_df = get_protocol_pool_config_df()
-    protocol_slug_list = protocol_df['protocol_slug'].tolist()
-    protocol_blockchain_list = protocol_df['chain'].tolist()
-    pool_type_list = protocol_df['pool_type'].tolist()
-    token_list = protocol_df['token'].tolist()
-
-    df_list = []
-
-    start_unix = int(date_to_unix_timestamp(START_DATE))
-
-    last_slug = ''
-    last_token = ''
-    last_pool_type = ''
-    i = 0
-
-    while i < len(protocol_slug_list):
-
-        if i == 1:
-            print('borrow time')
-
-        protocol_slug = protocol_slug_list[i]
-        protocol_blockchain = protocol_blockchain_list[i]
-        pool_type = pool_type_list[i]
-        token = token_list[i]
-
-        if protocol_slug == 'silo-finance':
-            print('silo')
-
-        # # we will only send another api ping if we are using a new slug
-        if last_slug != protocol_slug:
-            data = get_historic_protocol_tvl_json(protocol_slug)
-            time.sleep(COOLDOWN_TIME)
-        
-        else:
-            pass
-
-        # if last_pool_type != pool_type:
-        df = get_pool_type_df(data, protocol_blockchain, pool_type)
-
-        df = filter_start_timestamp(df, start_unix)
-        df['pool_type'] = pool_type
-        df = transpose_df(df)
-        df = add_start_token_amount_column(df)
-        df = add_change_in_token_amounts(df)
-
-        df.rename(columns = {'token_amount':'token_usd_amount', 'start_token_amount': 'start_token_usd_amount'}, inplace = True)
-
-        df = find_tvl_over_time(df)
-
-        df['protocol'] = protocol_slug
-
-        df_list.append(df)
-        
-        # else:
-        #     pass
-
-        # # updates our last known values to reduce api calls and computation needs
-        last_slug = protocol_slug
-        last_pool_type = pool_type
-
-        i += 1
-
-    df = pd.concat(df_list)
-
-    print(df)
-
-    df = df_token_cleanup(protocol_df, df)
-
-    return df
-
-# df = run_all()
-
-# print(df)
-
-# df.to_csv('test_test.csv', index=False)
-
 # # gets our incentive history
 def get_protocol_incentives_df():
 
@@ -521,7 +445,7 @@ def find_daily_incentives_usd(incentives_per_day_df, incentives_timeseries_price
 
     incentives_per_day_df['timestamp'] = incentives_per_day_df['timestamp'].astype(int)
     incentives_timeseries_price_df['timestamp'] = incentives_timeseries_price_df['timestamp'].astype(int)
-    
+
     # Perform the merge_asof operation
     df_result = pd.merge_asof(incentives_per_day_df, incentives_timeseries_price_df[['timestamp', 'price']], 
                             on='timestamp', 
@@ -535,14 +459,112 @@ def find_daily_incentives_usd(incentives_per_day_df, incentives_timeseries_price
 
     return incentives_per_day_df
 
-df = get_protocol_incentives_df()
-df = fill_incentive_days(df)
-df = get_incentives_unix_timestamps(df)
-data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, OPTIMISM_TOKEN_ADDRESS)
+# # runs all of our incentive data gathering functions and returns a dataframe of the info
+def get_incentive_df():
 
-incentives_timeseries_price_df = make_prices_df(data_list)
+    df = get_protocol_incentives_df()
+    df = fill_incentive_days(df)
+    df = get_incentives_unix_timestamps(df)
+    data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, OPTIMISM_TOKEN_ADDRESS)
 
-df = find_daily_incentives_usd(df, incentives_timeseries_price_df)
+    incentives_timeseries_price_df = make_prices_df(data_list)
+
+    df = find_daily_incentives_usd(df, incentives_timeseries_price_df)
+
+    return df
+
+# # merges our two dataframes together
+def combine_incentives_with_tvl(tvl_df, incentive_df):
+    # Ensure 'date' columns are in the same format in both dataframes
+    tvl_df['date'] = pd.to_datetime(tvl_df['date'])
+    incentive_df['date'] = pd.to_datetime(incentive_df['date'])
+
+    # Perform the left join
+    result_df = pd.merge(
+        tvl_df,
+        incentive_df[[ # 'chain', 'platform', 'segment', 'partner', 'token', 'pool_type', 'protocol_slug', 'date', 
+                      'protocol_slug', 'token', 'pool_type', 'date', 'epoch_token_incentives', 'incentives_per_day', 'price', 'incentives_per_day_usd']],
+        how='left',
+        left_on=['protocol', 'token', 'pool_type', 'date'],
+        right_on=['protocol_slug', 'token', 'pool_type', 'date']
+    )
+
+    result_df = result_df.drop(['protocol_slug'], axis=1)
+
+    result_df.fillna(0, inplace=True)
+
+    return result_df
+
+def run_all():
+    protocol_df = get_protocol_pool_config_df()
+    protocol_slug_list = protocol_df['protocol_slug'].tolist()
+    protocol_blockchain_list = protocol_df['chain'].tolist()
+    pool_type_list = protocol_df['pool_type'].tolist()
+    token_list = protocol_df['token'].tolist()
+
+    df_list = []
+
+    start_unix = int(date_to_unix_timestamp(START_DATE))
+
+    last_slug = ''
+    last_token = ''
+    last_pool_type = ''
+    i = 0
+
+    while i < len(protocol_slug_list):
+
+        protocol_slug = protocol_slug_list[i]
+        protocol_blockchain = protocol_blockchain_list[i]
+        pool_type = pool_type_list[i]
+        token = token_list[i]
+
+        # # we will only send another api ping if we are using a new slug
+        if last_slug != protocol_slug:
+            data = get_historic_protocol_tvl_json(protocol_slug)
+            time.sleep(COOLDOWN_TIME)
+        
+        else:
+            pass
+
+        # if last_pool_type != pool_type:
+        df = get_pool_type_df(data, protocol_blockchain, pool_type)
+
+        df = filter_start_timestamp(df, start_unix)
+        df['pool_type'] = pool_type
+        df = transpose_df(df)
+        df = add_start_token_amount_column(df)
+        df = add_change_in_token_amounts(df)
+
+        df.rename(columns = {'token_amount':'token_usd_amount', 'start_token_amount': 'start_token_usd_amount'}, inplace = True)
+
+        df = find_tvl_over_time(df)
+
+        df['protocol'] = protocol_slug
+
+        df_list.append(df)
+        
+        # else:
+        #     pass
+
+        # # updates our last known values to reduce api calls and computation needs
+        last_slug = protocol_slug
+        last_pool_type = pool_type
+
+        i += 1
+
+    df = pd.concat(df_list)
+
+    df = df_token_cleanup(protocol_df, df)
+    incentive_df = get_incentive_df()
+    df = combine_incentives_with_tvl(df, incentive_df)
+
+    return df
+
+
+df = run_all()
+# incentive_df = get_incentive_df()
+
+# df = combine_incentives_with_tvl(df, incentive_df)
 
 print(df)
 
