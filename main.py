@@ -6,12 +6,16 @@ from datetime import date
 from pandas import json_normalize
 import numpy as np
 import json
+from cloud_storage import cloud_storage as cs
 
-COOLDOWN_TIME = 1.5
+COOLDOWN_TIME = 2.5
 START_DATE = '2024-07-08'
 PRICE_BLOCKCHAIN = 'optimism'
 OPTIMISM_TOKEN_ADDRESS = '0x4200000000000000000000000000000000000042'
 WETH_TOKEN_ADDRESS = '0x4200000000000000000000000000000000000006'
+
+CLOUD_BUCKET_NAME = 'cooldowns2'
+CLOUD_PRICE_FILENAME = 'token_prices.zip'
 
 def get_protocol_pool_config_df():
 
@@ -375,22 +379,54 @@ def get_incentives_unix_timestamps(df):
     df['timestamp'] = df['timestamp'].astype(int)
     return df
 
+def make_dummy_cloud_price_df():
+
+    df = pd.DataFrame()
+
+    df['symbol'] = ['N/A']
+    df['timestamp'] = [1776]
+    df['price'] = [1776]
+    df['token_address'] = ['N/A']
+
+    return df
+
 # # will use the defillama price api to get the price of our token over time
 # # returns a list of jsons
+# # look here ** may need to remove the pricing functinoality that averages the two prices toghether
 def get_token_price_json_list(df, blockchain, token_address):
-    url = "https://coins.llama.fi/batchHistorical?coins=%7B%22optimism:0x4200000000000000000000000000000000000042%22:%20%5B1666876743,%201666862343%5D%7D&searchWidth=600"
-    url = "https://coins.llama.fi/batchHistorical?coins=%7B%22optimism:0x4200000000000000000000000000000000000042%22:%20%5B1686876743,%201686862343%5D%7D&searchWidth=600"
+    # url = "https://coins.llama.fi/batchHistorical?coins=%7B%22optimism:0x4200000000000000000000000000000000000042%22:%20%5B1666876743,%201666862343%5D%7D&searchWidth=600"
+    # url = "https://coins.llama.fi/batchHistorical?coins=%7B%22optimism:0x4200000000000000000000000000000000000042%22:%20%5B1686876743,%201686862343%5D%7D&searchWidth=600"
 
+    try:
+        cloud_price_df = cs.read_zip_csv_from_cloud_storage(CLOUD_PRICE_FILENAME, CLOUD_BUCKET_NAME)
+    except:
+        cloud_price_df = make_dummy_cloud_price_df()
+
+    cloud_price_df = cloud_price_df.loc[cloud_price_df['token_address'].str.upper() == token_address.upper()]
+
+    print(df)
+    print(cloud_price_df)
     unique_incentive_timestamps = df['timestamp'].unique()
 
+    # # so we always have something to run throug the API to reduce complexity
+    placeholder_timestamp_list = [unique_incentive_timestamps[0]]
+
+    # # if our cloud_df exists for a given token_address, we create a list of timestamps that don't already exist in the cloud
+    if len(cloud_price_df) > 0:
+        unique_incentive_timestamps = [ts for ts in unique_incentive_timestamps if ts not in cloud_price_df['timestamp'].values]
+    
     data_list = []
+
+    # # will substitute our list if there are no new values to our placeholder list
+    if len(unique_incentive_timestamps) < 1:
+        unique_incentive_timestamps = placeholder_timestamp_list
 
     for unique_incentive_timestamp in unique_incentive_timestamps:
 
         start_timestamp = unique_incentive_timestamp
         end_timestamp = start_timestamp + 14400
 
-        url = "https://coins.llama.fi/batchHistorical?coins=%7B%22" + blockchain + ":" + token_address + "%22:%20%5B" + str(start_timestamp) + ",%20" + str(end_timestamp) + "%5D%7D&searchWidth=600"
+        url = "https://coins.llama.fi/batchHistorical?coins=%7B%22" + blockchain + ":" + token_address + "%22:%20%5B" + str(end_timestamp) + ",%20" + str(start_timestamp) + "%5D%7D&searchWidth=600"
 
         # Send a GET request to the URL
         response = requests.get(url)
@@ -411,40 +447,64 @@ def get_token_price_json_list(df, blockchain, token_address):
 
 # # makes a dataframe representation of our historic pricing info
 def make_prices_df(data_list):
-
-    df_list = []
-    for data_json in data_list:
-        # Extract the relevant data
-        coin_data = list(data_json['coins'].values())[0]
-        symbol = coin_data['symbol']
-        prices = coin_data['prices']
-
-        # Create DataFrame
-        df = pd.DataFrame(prices)      
-
-        # Add symbol column
-        df['symbol'] = symbol          
-
-        # Reorder columns if desired
-        df = df[['symbol', 'timestamp', 'price']]   
-        df['price'] = df['price'].mean()
-
-        df = df.iloc[0:1]
-        df_list.append(df)
     
-    df = pd.concat(df_list)
+    df_list = []
 
-    return df
+    for data_json in data_list:
+        if 'coins' in data_json and data_json['coins']:
+            for token_address, coin_data in data_json['coins'].items():
+                symbol = coin_data['symbol']
+                prices = coin_data['prices']
+
+                # Create DataFrame
+                df = pd.DataFrame(prices)
+
+                # Add symbol and token_address columns
+                df['symbol'] = symbol
+                df['token_address'] = token_address.split(':')[-1]  # Remove 'optimism:' prefix
+
+                # Reorder columns
+                df = df[['symbol', 'token_address', 'timestamp', 'price', 'confidence']]
+
+                # Calculate average price if there are multiple prices
+                if len(df) > 1:
+                    df = df.groupby(['symbol', 'token_address', 'timestamp'], as_index=False).agg({
+                        'price': 'mean',
+                        'confidence': 'mean'
+                    })
+
+                df_list.append(df)
+
+    # # will try combining our dataframe with our existing cloud one and dropping duplicates
+    try:
+        cloud_df = cs.read_zip_csv_from_cloud_storage(CLOUD_PRICE_FILENAME, CLOUD_BUCKET_NAME)
+    except:
+        cloud_df = make_dummy_cloud_price_df()
+
+    if len(df_list) > 0:
+        df = pd.concat(df_list, ignore_index=True)
+
+        df = pd.concat([df, cloud_df])
+        df = df.drop_duplicates(subset=['symbol', 'timestamp'])
+
+
+    if len(df) > 0:
+        df = df[['symbol', 'token_address', 'timestamp', 'price']]
+        cs.df_write_to_cloud_storage_as_zip(df, CLOUD_PRICE_FILENAME, CLOUD_BUCKET_NAME)
+        return df
+    else:
+        return pd.DataFrame()  # Return an empty DataFrame if no valid data
 
 # # takes in our incentives_per_day_df + incentives_timeseries_price_df
 # # returns incentives_per_day_df with a new incentives_per_day_usd column that is the incentives_per day quantity * price
 def find_daily_incentives_usd(incentives_per_day_df, incentives_timeseries_price_df):
 
-    incentives_per_day_df = incentives_per_day_df.sort_values(by='timestamp')
-    incentives_timeseries_price_df = incentives_timeseries_price_df.sort_values(by='timestamp')
-
     incentives_per_day_df['timestamp'] = incentives_per_day_df['timestamp'].astype(int)
     incentives_timeseries_price_df['timestamp'] = incentives_timeseries_price_df['timestamp'].astype(int)
+    incentives_timeseries_price_df['price'] = incentives_timeseries_price_df['price'].astype(float)
+
+    incentives_per_day_df = incentives_per_day_df.sort_values(by='timestamp')
+    incentives_timeseries_price_df = incentives_timeseries_price_df.sort_values(by='timestamp')
 
     # Perform the merge_asof operation
     df_result = pd.merge_asof(incentives_per_day_df, incentives_timeseries_price_df[['timestamp', 'price']], 
@@ -463,13 +523,17 @@ def find_daily_incentives_usd(incentives_per_day_df, incentives_timeseries_price
 def get_incentive_df():
 
     df = get_protocol_incentives_df()
+    print(df)
     df = fill_incentive_days(df)
+    print(df)
     df = get_incentives_unix_timestamps(df)
+    print(df)
     data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, OPTIMISM_TOKEN_ADDRESS)
-
+    print(data_list)
     incentives_timeseries_price_df = make_prices_df(data_list)
-
+    print(incentives_timeseries_price_df)
     df = find_daily_incentives_usd(df, incentives_timeseries_price_df)
+    print(df)
 
     return df
 
@@ -560,12 +624,34 @@ def run_all():
 
     return df
 
+# # returns a dataframe of weth's price over time
+def get_weth_price_over_time(df):
+
+    data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, WETH_TOKEN_ADDRESS)
+    df = make_prices_df(data_list)
+
+    return df
+
+# # finds our start price, change in price usd, and change in price percentage per day relative to the start price
+def get_weth_price_change_since_start(df):
+
+    temp_df = df.loc[df['timestamp'] == df['timestamp'].min()]
+    start_price = temp_df['price'].min()
+    df['start_price'] = start_price
+
+    df['change_in_price_usd'] = df['price'] - df['start_price']
+    df['change_in_price_percentage'] = (df['price'] / df['start_price'] - 1)
+
+    return df
 
 df = run_all()
-# incentive_df = get_incentive_df()
 
-# df = combine_incentives_with_tvl(df, incentive_df)
+# df = get_weth_price_over_time(df)
+
+# df = get_weth_price_change_since_start(df)
+
+# df = cs.read_zip_csv_from_cloud_storage(CLOUD_PRICE_FILENAME, CLOUD_BUCKET_NAME)
 
 print(df)
 
-df.to_csv('test_test.csv', index=False)
+# df.to_csv('test_test.csv', index=False)
