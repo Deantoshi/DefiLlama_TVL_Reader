@@ -16,6 +16,7 @@ WETH_TOKEN_ADDRESS = '0x4200000000000000000000000000000000000006'
 
 CLOUD_BUCKET_NAME = 'cooldowns2'
 CLOUD_PRICE_FILENAME = 'token_prices.zip'
+CLOUD_DATA_FILENAME = 'super_fest.zip'
 
 def get_protocol_pool_config_df():
 
@@ -429,17 +430,12 @@ def get_token_price_json_list(df, blockchain, token_address):
     # # finds all the unique dates from our defillama df
     df_date_list = df['date'].unique()
 
-    print(cloud_date_list)
-    print(df_date_list)
-
     # unique_incentive_timestamps = [ts for ts in unique_incentive_timestamps if ts not in cloud_price_df['timestamp'].values]
 
     # # finds the unique dates from defillama that are not present in the cloud
     dates_to_check_list = [unique_date for unique_date in df_date_list if unique_date not in cloud_date_list]
     # # turns these unique dates into unix timestamps
     unique_timestamp_to_check = [date_to_unix_timestamp(str(unique_date)) for unique_date in dates_to_check_list]
-    print(dates_to_check_list)
-    print(unique_timestamp_to_check)
 
     # # placeholder timestamp to use
     if len(unique_timestamp_to_check) < 1:
@@ -450,10 +446,9 @@ def get_token_price_json_list(df, blockchain, token_address):
     for unique_timestamp in unique_timestamp_to_check:
 
         start_timestamp = unique_timestamp
-        end_timestamp = start_timestamp + 10
+        end_timestamp = start_timestamp + 14400
 
         url = "https://coins.llama.fi/batchHistorical?coins=%7B%22" + blockchain + ":" + token_address + "%22:%20%5B" + str(end_timestamp) + ",%20" + str(start_timestamp) + "%5D%7D&searchWidth=600"
-        print(url)
         # Send a GET request to the URL
         response = requests.get(url)
 
@@ -464,7 +459,8 @@ def get_token_price_json_list(df, blockchain, token_address):
             if len(data['coins']) > 0:
                 data_list.append(data)
             else:
-                print('Look')
+                unique_timestamp_to_check.append(1720569600)
+                pass
         else:
             # Request failed
             print(f"Request failed with status code: {response.status_code}")
@@ -642,14 +638,19 @@ def run_all():
         i += 1
 
     df = pd.concat(df_list)
-    print(df)
     df = df_token_cleanup(protocol_df, df)
-    print(df)
     incentive_df = get_incentive_df()
-    print(df)
     df = combine_incentives_with_tvl(df, incentive_df)
-    print(df)
-    return df
+
+    tvl_df = df
+    df = get_weth_price_over_time(df)
+
+    df = get_weth_price_change_since_start(df)
+
+    merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
+
+    cs.df_write_to_cloud_storage_as_zip(merged_df, CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+    return merged_df
 
 # # returns a dataframe of weth's price over time
 def get_weth_price_over_time(df):
@@ -695,13 +696,38 @@ def unix_timestamp_to_date(unix_timestamp):
     
     return date_string
 
+# # merges those dataframes as the name implies
+def merge_tvl_and_weth_dfs(tvl_df, weth_df):
+    # Perform the left merge
+    merged_df = tvl_df.merge(weth_df, on='date', how='left', suffixes=('', '_weth'))
+
+    # Optionally, reorder the columns for better readability
+    column_order = [
+        'date', 'timestamp', 'token', 'pool_type', 'protocol',
+        'token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd',
+        'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'price',
+        'incentives_per_day_usd', 'symbol', 'token_address', 'timestamp_weth',
+        'price_weth', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage'
+    ]
+    merged_df = merged_df[column_order]
+
+    # Reset the index if needed
+    merged_df = merged_df.reset_index(drop=True)
+
+    print(merged_df)
+
+    merged_df = merged_df.ffill()  # Forward fill: uses the last known value
+
+    return merged_df
+
 start_time = time.time()
 df = run_all()
-print(df)
-df = get_weth_price_over_time(df)
+# tvl_df = df
+# df = get_weth_price_over_time(df)
 
-df = get_weth_price_change_since_start(df)
+# df = get_weth_price_change_since_start(df)
 
+# merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
 # df = cs.read_zip_csv_from_cloud_storage(CLOUD_PRICE_FILENAME, CLOUD_BUCKET_NAME)
 
 print(df)

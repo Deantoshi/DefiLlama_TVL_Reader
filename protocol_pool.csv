@@ -1,3 +1,5 @@
 chain,platform,segment,partner,token,pool_type,protocol_slug
-Mode,Ironclad,Lending,Ironclad,weth,supply,ironclad-finance
-Mode,Ironclad,Lending,Ironclad,weth,borrow,ironclad-finance
+Base,Aave,Lending,Aave,WETH,borrow,aave-v3
+Base,Aave,Lending,Aave,WEETH.BASE,supply,aave-v3
+Base,Aave,Lending,Aave,WETH,supply,aave-v3
+Optimism,Silo,Lending,Silo,WETH,supply,silo-finance
