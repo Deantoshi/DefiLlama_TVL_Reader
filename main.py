@@ -8,7 +8,7 @@ import numpy as np
 import json
 from cloud_storage import cloud_storage as cs
 
-COOLDOWN_TIME = 2.5
+COOLDOWN_TIME = 5
 START_DATE = '2024-07-08'
 PRICE_BLOCKCHAIN = 'optimism'
 OPTIMISM_TOKEN_ADDRESS = '0x4200000000000000000000000000000000000042'
@@ -385,11 +385,24 @@ def make_dummy_cloud_price_df():
 
     df['symbol'] = ['N/A']
     df['timestamp'] = [1776]
+    df['date'] = ['2024-01-1']
     df['price'] = [1776]
     df['token_address'] = ['N/A']
 
     return df
 
+def parse_date(date_string):
+    try:
+        # Try parsing with microseconds
+        return datetime.strptime(str(date_string), '%Y-%m-%dT%H:%M:%S.%f').strftime('%Y-%m-%d')
+    except ValueError:
+        try:
+            # If that fails, try parsing without microseconds
+            return datetime.strptime(str(date_string), '%Y-%m-%dT%H:%M:%S').strftime('%Y-%m-%d')
+        except ValueError:
+            # If both fail, return the original string
+            return str(date_string)
+        
 # # will use the defillama price api to get the price of our token over time
 # # returns a list of jsons
 # # look here ** may need to remove the pricing functinoality that averages the two prices toghether
@@ -404,30 +417,43 @@ def get_token_price_json_list(df, blockchain, token_address):
 
     cloud_price_df = cloud_price_df.loc[cloud_price_df['token_address'].str.upper() == token_address.upper()]
 
-    print(df)
-    print(cloud_price_df)
-    unique_incentive_timestamps = df['timestamp'].unique()
+    if len(cloud_price_df) < 1:
+        cloud_price_df = make_dummy_cloud_price_df()
 
-    # # so we always have something to run throug the API to reduce complexity
-    placeholder_timestamp_list = [unique_incentive_timestamps[0]]
+    # If you want it as a string in 'YYYY-MM-DD' format instead of a date object
+    cloud_price_df['date'] = pd.to_datetime(cloud_price_df['date']).dt.strftime('%Y-%m-%d')
+    df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
 
-    # # if our cloud_df exists for a given token_address, we create a list of timestamps that don't already exist in the cloud
-    if len(cloud_price_df) > 0:
-        unique_incentive_timestamps = [ts for ts in unique_incentive_timestamps if ts not in cloud_price_df['timestamp'].values]
-    
+    # # finds any unique dates from the cloud
+    cloud_date_list = cloud_price_df['date'].unique()
+    # # finds all the unique dates from our defillama df
+    df_date_list = df['date'].unique()
+
+    print(cloud_date_list)
+    print(df_date_list)
+
+    # unique_incentive_timestamps = [ts for ts in unique_incentive_timestamps if ts not in cloud_price_df['timestamp'].values]
+
+    # # finds the unique dates from defillama that are not present in the cloud
+    dates_to_check_list = [unique_date for unique_date in df_date_list if unique_date not in cloud_date_list]
+    # # turns these unique dates into unix timestamps
+    unique_timestamp_to_check = [date_to_unix_timestamp(str(unique_date)) for unique_date in dates_to_check_list]
+    print(dates_to_check_list)
+    print(unique_timestamp_to_check)
+
+    # # placeholder timestamp to use
+    if len(unique_timestamp_to_check) < 1:
+        unique_timestamp_to_check = [date_to_unix_timestamp(df_date_list[0])]
+
+
     data_list = []
+    for unique_timestamp in unique_timestamp_to_check:
 
-    # # will substitute our list if there are no new values to our placeholder list
-    if len(unique_incentive_timestamps) < 1:
-        unique_incentive_timestamps = placeholder_timestamp_list
-
-    for unique_incentive_timestamp in unique_incentive_timestamps:
-
-        start_timestamp = unique_incentive_timestamp
-        end_timestamp = start_timestamp + 14400
+        start_timestamp = unique_timestamp
+        end_timestamp = start_timestamp + 10
 
         url = "https://coins.llama.fi/batchHistorical?coins=%7B%22" + blockchain + ":" + token_address + "%22:%20%5B" + str(end_timestamp) + ",%20" + str(start_timestamp) + "%5D%7D&searchWidth=600"
-
+        print(url)
         # Send a GET request to the URL
         response = requests.get(url)
 
@@ -435,7 +461,10 @@ def get_token_price_json_list(df, blockchain, token_address):
         if response.status_code == 200:
             # Request was successful
             data = response.json()  # Parse the JSON response
-            data_list.append(data)
+            if len(data['coins']) > 0:
+                data_list.append(data)
+            else:
+                print('Look')
         else:
             # Request failed
             print(f"Request failed with status code: {response.status_code}")
@@ -465,13 +494,14 @@ def make_prices_df(data_list):
 
                 # Reorder columns
                 df = df[['symbol', 'token_address', 'timestamp', 'price', 'confidence']]
-
+                df['timestamp'] = df['timestamp'].astype(int)
+                df['date'] = df['timestamp'].apply(unix_timestamp_to_date)
                 # Calculate average price if there are multiple prices
-                if len(df) > 1:
-                    df = df.groupby(['symbol', 'token_address', 'timestamp'], as_index=False).agg({
-                        'price': 'mean',
-                        'confidence': 'mean'
-                    })
+                # if len(df) > 1:
+                #     df = df.groupby(['symbol', 'token_address', 'timestamp'], as_index=False).agg({
+                #         'price': 'mean',
+                #         'confidence': 'mean'
+                #     })
 
                 df_list.append(df)
 
@@ -489,7 +519,9 @@ def make_prices_df(data_list):
 
 
     if len(df) > 0:
-        df = df[['symbol', 'token_address', 'timestamp', 'price']]
+        df['timestamp'] = df['timestamp'].astype(int)
+        df['date'] = df['timestamp'].apply(unix_timestamp_to_date)
+        df = df[['symbol', 'token_address', 'timestamp', 'date','price']]
         cs.df_write_to_cloud_storage_as_zip(df, CLOUD_PRICE_FILENAME, CLOUD_BUCKET_NAME)
         return df
     else:
@@ -523,17 +555,11 @@ def find_daily_incentives_usd(incentives_per_day_df, incentives_timeseries_price
 def get_incentive_df():
 
     df = get_protocol_incentives_df()
-    print(df)
     df = fill_incentive_days(df)
-    print(df)
     df = get_incentives_unix_timestamps(df)
-    print(df)
     data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, OPTIMISM_TOKEN_ADDRESS)
-    print(data_list)
     incentives_timeseries_price_df = make_prices_df(data_list)
-    print(incentives_timeseries_price_df)
     df = find_daily_incentives_usd(df, incentives_timeseries_price_df)
-    print(df)
 
     return df
 
@@ -592,7 +618,6 @@ def run_all():
 
         # if last_pool_type != pool_type:
         df = get_pool_type_df(data, protocol_blockchain, pool_type)
-
         df = filter_start_timestamp(df, start_unix)
         df['pool_type'] = pool_type
         df = transpose_df(df)
@@ -617,11 +642,13 @@ def run_all():
         i += 1
 
     df = pd.concat(df_list)
-
+    print(df)
     df = df_token_cleanup(protocol_df, df)
+    print(df)
     incentive_df = get_incentive_df()
+    print(df)
     df = combine_incentives_with_tvl(df, incentive_df)
-
+    print(df)
     return df
 
 # # returns a dataframe of weth's price over time
@@ -634,24 +661,51 @@ def get_weth_price_over_time(df):
 
 # # finds our start price, change in price usd, and change in price percentage per day relative to the start price
 def get_weth_price_change_since_start(df):
-
+    df[['timestamp']] = df[['timestamp']].astype(int)
+    df['price'] = df['price'].astype(float)
+    df = df.loc[df['symbol'] == 'WETH']
     temp_df = df.loc[df['timestamp'] == df['timestamp'].min()]
     start_price = temp_df['price'].min()
-    df['start_price'] = start_price
+    df['weth_start_price'] = start_price
 
-    df['change_in_price_usd'] = df['price'] - df['start_price']
-    df['change_in_price_percentage'] = (df['price'] / df['start_price'] - 1)
+    df['weth_change_in_price_usd'] = df['price'] - df['weth_start_price']
+    df['weth_change_in_price_percentage'] = (df['price'] / df['weth_start_price'] - 1)
+
+    df = df.groupby('date').agg({
+    'symbol': 'first',
+    'token_address': 'first',
+    'timestamp': 'first',
+    'price': 'mean',
+    'weth_start_price': 'first',
+    'weth_change_in_price_usd': 'mean',
+    'weth_change_in_price_percentage': 'mean'
+    }).reset_index()
+    
+    df = df.sort_values(by='timestamp')
 
     return df
 
+# # converts a unix into a date
+def unix_timestamp_to_date(unix_timestamp):
+    # Convert Unix timestamp to datetime object
+    date_object = datetime.fromtimestamp(unix_timestamp)
+    
+    # Convert datetime object to string in desired format
+    date_string = date_object.strftime("%Y-%m-%d")
+    
+    return date_string
+
+start_time = time.time()
 df = run_all()
+print(df)
+df = get_weth_price_over_time(df)
 
-# df = get_weth_price_over_time(df)
-
-# df = get_weth_price_change_since_start(df)
+df = get_weth_price_change_since_start(df)
 
 # df = cs.read_zip_csv_from_cloud_storage(CLOUD_PRICE_FILENAME, CLOUD_BUCKET_NAME)
 
 print(df)
+end_time = time.time()
+print('Completed looking in: ', end_time - start_time, ' Seconds')
 
-# df.to_csv('test_test.csv', index=False)
+df.to_csv('test_test.csv', index=False)
