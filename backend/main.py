@@ -743,8 +743,8 @@ def run_all():
     merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
 
     cs.df_write_to_cloud_storage_as_zip(merged_df, CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
-    print(merged_df)
-    return merged_df
+    
+    return jsonify({"status": 200}), 200
 
 if __name__ == '__main__':
     app.run(use_reloader=True, port=8000, threaded=True, DEBUG=True)
