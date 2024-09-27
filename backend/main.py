@@ -579,6 +579,7 @@ def get_incentive_df():
     df = get_incentives_unix_timestamps(df)
     data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, OPTIMISM_TOKEN_ADDRESS)
     incentives_timeseries_price_df = make_prices_df(data_list)
+    incentives_timeseries_price_df = incentives_timeseries_price_df.loc[incentives_timeseries_price_df['symbol'] == 'op']
     df = find_daily_incentives_usd(df, incentives_timeseries_price_df)
 
     return df
@@ -745,6 +746,23 @@ def run_all():
     cs.df_write_to_cloud_storage_as_zip(merged_df, CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
     
     return jsonify({"status": 200}), 200
+
+
+# # does as the name implies
+@app.route('/api/pool_tvl_incentives_and_change_in_weth_price', methods=['GET'])
+def get_pool_tvl_incentives_and_change_in_weth_price():
+    df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+
+    # Group the data by protocol, token, and pool_type
+    grouped = df.groupby(['protocol', 'token', 'pool_type'])
+    
+    result = {}
+    for (protocol, token, pool_type), group in grouped:
+        key = f"{protocol}_{token}_{pool_type}"
+        result[key] = group[['date', 'token_usd_amount', 'raw_change_in_usd', 
+                             'incentives_per_day_usd', 'weth_change_in_price_percentage']].to_dict('records')
+    
+    return jsonify(result)
 
 if __name__ == '__main__':
     app.run(use_reloader=True, port=8000, threaded=True, DEBUG=True)
