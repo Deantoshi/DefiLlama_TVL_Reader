@@ -20,6 +20,8 @@ import logging
 import time
 import zipfile
 import csv
+from functools import lru_cache
+from typing import List, Dict
 
 COOLDOWN_TIME = 5
 START_DATE = '2024-07-08'
@@ -411,7 +413,7 @@ def make_dummy_cloud_price_df():
     df['symbol'] = ['N/A']
     df['timestamp'] = [1776]
     df['date'] = ['2024-01-1']
-    df['price'] = [1776]
+    df['price'] = [1.5]
     df['token_address'] = ['N/A']
 
     return df
@@ -626,11 +628,13 @@ def get_weth_price_change_since_start(df):
     df['weth_change_in_price_usd'] = df['price'] - df['weth_start_price']
     df['weth_change_in_price_percentage'] = (df['price'] / df['weth_start_price'] - 1)
 
+    df = df.rename(columns = {'price': 'weth_price'})
+
     df = df.groupby('date').agg({
     'symbol': 'first',
     'token_address': 'first',
     'timestamp': 'first',
-    'price': 'mean',
+    'weth_price': 'mean',
     'weth_start_price': 'first',
     'weth_change_in_price_usd': 'mean',
     'weth_change_in_price_percentage': 'mean'
@@ -652,27 +656,29 @@ def unix_timestamp_to_date(unix_timestamp):
 
 # # merges those dataframes as the name implies
 def merge_tvl_and_weth_dfs(tvl_df, weth_df):
+
+    tvl_df = tvl_df.rename(columns={'price': 'op_price'})
+
     # Perform the left merge
     merged_df = tvl_df.merge(weth_df, on='date', how='left', suffixes=('', '_weth'))
 
     # Optionally, reorder the columns for better readability
     column_order = [
-        'date', 'timestamp', 'token', 'pool_type', 'protocol',
+        'date', 'timestamp', 'chain', 'token', 'pool_type', 'protocol',
         'token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd',
-        'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'price',
+        'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'op_price',
         'incentives_per_day_usd', 'symbol', 'token_address', 'timestamp_weth',
-        'price_weth', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage'
+        'weth_price', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage'
     ]
     merged_df = merged_df[column_order]
 
     # Reset the index if needed
     merged_df = merged_df.reset_index(drop=True)
 
-    print(merged_df)
-
     merged_df = merged_df.ffill()  # Forward fill: uses the last known value
 
     return merged_df
+
 
 @app.route('/api/update_data', methods=['GET'])
 def run_all():
@@ -681,6 +687,7 @@ def run_all():
     protocol_blockchain_list = protocol_df['chain'].tolist()
     pool_type_list = protocol_df['pool_type'].tolist()
     token_list = protocol_df['token'].tolist()
+    chain_list = protocol_df['chain'].tolist()
 
     df_list = []
 
@@ -697,6 +704,7 @@ def run_all():
         protocol_blockchain = protocol_blockchain_list[i]
         pool_type = pool_type_list[i]
         token = token_list[i]
+        chain = chain_list[i]
 
         # # we will only send another api ping if we are using a new slug
         if last_slug != protocol_slug:
@@ -719,6 +727,7 @@ def run_all():
         df = find_tvl_over_time(df)
 
         df['protocol'] = protocol_slug
+        df['chain'] = chain
 
         df_list.append(df)
         
@@ -748,19 +757,38 @@ def run_all():
     return jsonify({"status": 200}), 200
 
 
-# # does as the name implies
+@lru_cache(maxsize=1)
+def get_incentive_combo_list() -> List[str]:
+    incentive_history_df = pd.read_csv('protocol_incentive_history.csv')
+    incentive_history_df['combo_name'] = (
+        incentive_history_df['chain'] +
+        incentive_history_df['protocol_slug'] +
+        incentive_history_df['token'] +
+        incentive_history_df['pool_type']
+    )
+    return incentive_history_df['combo_name'].unique().tolist()
+
+# does as the name implies
 @app.route('/api/pool_tvl_incentives_and_change_in_weth_price', methods=['GET'])
 def get_pool_tvl_incentives_and_change_in_weth_price():
     df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
-
-    # Group the data by protocol, token, and pool_type
-    grouped = df.groupby(['protocol', 'token', 'pool_type'])
+    df['combo_name'] = df['chain'] + df['protocol'] + df['token'] + df['pool_type']
     
-    result = {}
-    for (protocol, token, pool_type), group in grouped:
-        key = f"{protocol}_{token}_{pool_type}"
-        result[key] = group[['date', 'token_usd_amount', 'raw_change_in_usd', 
-                             'incentives_per_day_usd', 'weth_change_in_price_percentage']].to_dict('records')
+    incentive_combo_list = get_incentive_combo_list()
+    df = df[df['combo_name'].isin(incentive_combo_list)]
+    
+    columns_to_keep = ['date', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage']
+    df = df[columns_to_keep]
+    
+    # Convert 'date' column to datetime, sort, and format to ISO 8601
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.sort_values('date')
+    df['date'] = df['date'].dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    
+    result: Dict[str, List[Dict]] = {}
+    for name, group in df.groupby(['protocol', 'token', 'pool_type']):
+        key = f"{name[0]}|{name[1]}|{name[2]}"  # Create a string key
+        result[key] = group.drop(['protocol', 'token', 'pool_type'], axis=1).to_dict('records')
     
     return jsonify(result)
 

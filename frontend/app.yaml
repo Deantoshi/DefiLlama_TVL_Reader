@@ -1,0 +1,21 @@
+env_variables:
+  VITE_API_URL: "https://api-dot-internal-website-427620.uc.r.appspot.com"
+
+service: superfest-frontend
+runtime: nodejs18
+entrypoint: node server.js
+
+handlers:
+- url: /(.*\..+)$
+  static_files: dist/\1
+  upload: dist/(.*\..+)$
+- url: /.*
+  static_files: dist/index.html
+  upload: dist/index.html
+
+instance_class: F4
+
+
+# Specify the maximum number of instances
+automatic_scaling:
+  max_instances: 1
