@@ -1,8 +1,7 @@
 import pandas as pd
 import requests
-from datetime import datetime, timezone
+from datetime import datetime as dt, date, timezone
 import time
-from datetime import date
 from pandas import json_normalize
 import numpy as np
 import json
@@ -20,7 +19,6 @@ from io import BytesIO
 import logging
 import time
 import zipfile
-import datetime
 import csv
 
 COOLDOWN_TIME = 5
@@ -32,6 +30,17 @@ WETH_TOKEN_ADDRESS = '0x4200000000000000000000000000000000000006'
 CLOUD_BUCKET_NAME = 'cooldowns2'
 CLOUD_PRICE_FILENAME = 'token_prices.zip'
 CLOUD_DATA_FILENAME = 'super_fest.zip'
+
+# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+app = Flask(__name__)
+cors = CORS(app, origins='*')
+# CORS(app, resources={r"/api/*": {"origins": "https://frontend-dot-internal-website-427620.uc.r.appspot.com"}})
+
+# Initialize GCP storage client
+# credentials, project = default()
+# storage_client = storage.Client(credentials=credentials, project=project)
 
 def get_protocol_pool_config_df():
 
@@ -124,14 +133,14 @@ def turn_json_into_df(data):
 
 def get_utc_start_day():
     # Create a datetime object for July 7th, 2024, at 00:00:00 UTC
-    date = datetime(2024, 7, 10, 0, 0, 0, tzinfo=timezone.utc)
+    date = dt(2024, 7, 10, 0, 0, 0, tzinfo=timezone.utc)
 
     return date
 
 # # date string into unix timestamp
 def date_to_unix_timestamp(date_string, format="%Y-%m-%d"):
     # Convert string to datetime object
-    date_object = datetime.strptime(date_string, format)
+    date_object = dt.strptime(date_string, format)
     
     # Convert datetime object to Unix timestamp
     unix_timestamp = int(time.mktime(date_object.timetuple()))
@@ -410,11 +419,11 @@ def make_dummy_cloud_price_df():
 def parse_date(date_string):
     try:
         # Try parsing with microseconds
-        return datetime.strptime(str(date_string), '%Y-%m-%dT%H:%M:%S.%f').strftime('%Y-%m-%d')
+        return dt.strptime(str(date_string), '%Y-%m-%dT%H:%M:%S.%f').strftime('%Y-%m-%d')
     except ValueError:
         try:
             # If that fails, try parsing without microseconds
-            return datetime.strptime(str(date_string), '%Y-%m-%dT%H:%M:%S').strftime('%Y-%m-%d')
+            return dt.strptime(str(date_string), '%Y-%m-%dT%H:%M:%S').strftime('%Y-%m-%d')
         except ValueError:
             # If both fail, return the original string
             return str(date_string)
@@ -596,6 +605,75 @@ def combine_incentives_with_tvl(tvl_df, incentive_df):
 
     return result_df
 
+# # returns a dataframe of weth's price over time
+def get_weth_price_over_time(df):
+
+    data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, WETH_TOKEN_ADDRESS)
+    df = make_prices_df(data_list)
+
+    return df
+
+# # finds our start price, change in price usd, and change in price percentage per day relative to the start price
+def get_weth_price_change_since_start(df):
+    df[['timestamp']] = df[['timestamp']].astype(int)
+    df['price'] = df['price'].astype(float)
+    df = df.loc[df['symbol'] == 'WETH']
+    temp_df = df.loc[df['timestamp'] == df['timestamp'].min()]
+    start_price = temp_df['price'].min()
+    df['weth_start_price'] = start_price
+
+    df['weth_change_in_price_usd'] = df['price'] - df['weth_start_price']
+    df['weth_change_in_price_percentage'] = (df['price'] / df['weth_start_price'] - 1)
+
+    df = df.groupby('date').agg({
+    'symbol': 'first',
+    'token_address': 'first',
+    'timestamp': 'first',
+    'price': 'mean',
+    'weth_start_price': 'first',
+    'weth_change_in_price_usd': 'mean',
+    'weth_change_in_price_percentage': 'mean'
+    }).reset_index()
+    
+    df = df.sort_values(by='timestamp')
+
+    return df
+
+# # converts a unix into a date
+def unix_timestamp_to_date(unix_timestamp):
+    # Convert Unix timestamp to datetime object
+    date_object = dt.fromtimestamp(unix_timestamp)
+    
+    # Convert datetime object to string in desired format
+    date_string = date_object.strftime("%Y-%m-%d")
+    
+    return date_string
+
+# # merges those dataframes as the name implies
+def merge_tvl_and_weth_dfs(tvl_df, weth_df):
+    # Perform the left merge
+    merged_df = tvl_df.merge(weth_df, on='date', how='left', suffixes=('', '_weth'))
+
+    # Optionally, reorder the columns for better readability
+    column_order = [
+        'date', 'timestamp', 'token', 'pool_type', 'protocol',
+        'token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd',
+        'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'price',
+        'incentives_per_day_usd', 'symbol', 'token_address', 'timestamp_weth',
+        'price_weth', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage'
+    ]
+    merged_df = merged_df[column_order]
+
+    # Reset the index if needed
+    merged_df = merged_df.reset_index(drop=True)
+
+    print(merged_df)
+
+    merged_df = merged_df.ffill()  # Forward fill: uses the last known value
+
+    return merged_df
+
+@app.route('/api/update_data', methods=['GET'])
 def run_all():
     protocol_df = get_protocol_pool_config_df()
     protocol_slug_list = protocol_df['protocol_slug'].tolist()
@@ -665,88 +743,8 @@ def run_all():
     merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
 
     cs.df_write_to_cloud_storage_as_zip(merged_df, CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
-    return merged_df
-
-# # returns a dataframe of weth's price over time
-def get_weth_price_over_time(df):
-
-    data_list = get_token_price_json_list(df, PRICE_BLOCKCHAIN, WETH_TOKEN_ADDRESS)
-    df = make_prices_df(data_list)
-
-    return df
-
-# # finds our start price, change in price usd, and change in price percentage per day relative to the start price
-def get_weth_price_change_since_start(df):
-    df[['timestamp']] = df[['timestamp']].astype(int)
-    df['price'] = df['price'].astype(float)
-    df = df.loc[df['symbol'] == 'WETH']
-    temp_df = df.loc[df['timestamp'] == df['timestamp'].min()]
-    start_price = temp_df['price'].min()
-    df['weth_start_price'] = start_price
-
-    df['weth_change_in_price_usd'] = df['price'] - df['weth_start_price']
-    df['weth_change_in_price_percentage'] = (df['price'] / df['weth_start_price'] - 1)
-
-    df = df.groupby('date').agg({
-    'symbol': 'first',
-    'token_address': 'first',
-    'timestamp': 'first',
-    'price': 'mean',
-    'weth_start_price': 'first',
-    'weth_change_in_price_usd': 'mean',
-    'weth_change_in_price_percentage': 'mean'
-    }).reset_index()
-    
-    df = df.sort_values(by='timestamp')
-
-    return df
-
-# # converts a unix into a date
-def unix_timestamp_to_date(unix_timestamp):
-    # Convert Unix timestamp to datetime object
-    date_object = datetime.fromtimestamp(unix_timestamp)
-    
-    # Convert datetime object to string in desired format
-    date_string = date_object.strftime("%Y-%m-%d")
-    
-    return date_string
-
-# # merges those dataframes as the name implies
-def merge_tvl_and_weth_dfs(tvl_df, weth_df):
-    # Perform the left merge
-    merged_df = tvl_df.merge(weth_df, on='date', how='left', suffixes=('', '_weth'))
-
-    # Optionally, reorder the columns for better readability
-    column_order = [
-        'date', 'timestamp', 'token', 'pool_type', 'protocol',
-        'token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd',
-        'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'price',
-        'incentives_per_day_usd', 'symbol', 'token_address', 'timestamp_weth',
-        'price_weth', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage'
-    ]
-    merged_df = merged_df[column_order]
-
-    # Reset the index if needed
-    merged_df = merged_df.reset_index(drop=True)
-
     print(merged_df)
-
-    merged_df = merged_df.ffill()  # Forward fill: uses the last known value
-
     return merged_df
 
-start_time = time.time()
-df = run_all()
-# tvl_df = df
-# df = get_weth_price_over_time(df)
-
-# df = get_weth_price_change_since_start(df)
-
-# merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
-# df = cs.read_zip_csv_from_cloud_storage(CLOUD_PRICE_FILENAME, CLOUD_BUCKET_NAME)
-
-print(df)
-end_time = time.time()
-print('Completed looking in: ', end_time - start_time, ' Seconds')
-
-df.to_csv('test_test.csv', index=False)
+if __name__ == '__main__':
+    app.run(use_reloader=True, port=8000, threaded=True, DEBUG=True)

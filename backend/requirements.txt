@@ -14,5 +14,4 @@ google-crc32c
 google-resumable-media
 googleapis-common-protos
 flask
-web3
 flask-CORS

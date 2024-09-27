@@ -1,6 +1,4 @@
 from flask import Flask, request, jsonify
-from web3 import Web3
-from web3.middleware import geth_poa_middleware
 import pandas as pd
 import json
 # from functools import cache
@@ -24,7 +22,8 @@ import zipfile
 
 # Assuming the key file is in your user's home directory
 HOME_DIR = os.path.expanduser('~')
-PATH = os.path.join(HOME_DIR, 'fast-web-419215-35d284e06546.json')
+# PATH = os.path.join(HOME_DIR, 'fast-web-419215-35d284e06546.json')
+PATH = os.path.join(os.path.dirname(__file__), 'fast-web-419215-35d284e06546.json')
 STORAGE_CLIENT = storage.Client.from_service_account_json(PATH)
 
 # @cache
