@@ -38,9 +38,9 @@ const formatXAxis = (tickItem: string) => {
 
 const formatToMillions = (value: number) => {
   if (value >= 1000000) {
-    return `${(value / 1000000).toFixed(1)}M`;
+    return `${(value / 1000000).toFixed(0)}M`;
   } else if (value >= 1000) {
-    return `${(value / 1000).toFixed(1)}K`;
+    return `${(value / 1000).toFixed(0)}K`;
   }
   return value.toFixed(0);
 };
@@ -73,23 +73,41 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
           <YAxis 
             yAxisId="left" 
             tickFormatter={formatToMillions}
-            label={{ value: 'USD (Millions)', angle: -90, position: 'insideLeft' }}
+            label={{ 
+              value: 'USD (Millions)', 
+              angle: -90, 
+              position: 'outside',
+              offset: 5,
+              dx: -28, // Adjust this value as needed
+            }}
           />
           <YAxis 
             yAxisId="right" 
             orientation="right" 
             domain={yAxisDomain} 
-            tickFormatter={(value) => `${value.toFixed(2)}%`}
-            label={{ value: 'WETH Price Change (%)', angle: -90, position: 'insideRight' }}
+            tickFormatter={(value) => `${value.toFixed(0)}%`}
+            label={{ 
+              value: 'WETH Price Change (%)', 
+              angle: -90, 
+              position: 'outside',
+              offset: 5,
+              dx: 28, // Adjust this value as needed
+            }}
           />
           <Tooltip
+              contentStyle={{
+                backgroundColor: '#404040',
+                padding: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '4px'
+              }}
             formatter={(value, name, props) => {
               switch (name) {
                 case "WETH Price Change %":
                   return [`${Number(value).toFixed(2)}%`, "WETH Price Change"];
                 case "Pool TVL":
-                case "Pool Change in USD":
-                case "Incentives per Day USD":
+                case "Pool Change Since Start":
+                case "Incentives per Day":
                   return [formatCurrency(Number(value)), name];
                 default:
                   return [value, name];
@@ -99,8 +117,8 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
           />
           <Legend />
           <Bar yAxisId="left" dataKey="token_usd_amount" stackId="a" fill="#8884d8" name="Pool TVL" />
-          <Bar yAxisId="left" dataKey="raw_change_in_usd" stackId="a" fill="#82ca9d" name="Pool Change in USD" />
-          <Bar yAxisId="left" dataKey="incentives_per_day_usd" stackId="a" fill="#ffc658" name="Incentives per Day USD" />
+          <Bar yAxisId="left" dataKey="raw_change_in_usd" stackId="a" fill="#82ca9d" name="Pool Change Since Start" />
+          <Bar yAxisId="left" dataKey="incentives_per_day_usd" stackId="a" fill="#ffc658" name="Incentives per Day" />
           <Line 
             yAxisId="right" 
             type="monotone" 
