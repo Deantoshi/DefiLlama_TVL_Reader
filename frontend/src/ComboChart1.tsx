@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface ChartData {
@@ -15,21 +15,17 @@ interface ChartProps {
   };
 }
 
-const calculateYAxisDomain = (data: ChartData[]) => {
-  const percentages = data.map(item => item.weth_change_in_price_percentage);
-  const minValue = Math.min(...percentages);
-  const maxValue = Math.max(...percentages);
-  return [Math.floor(minValue * 1.1), Math.ceil(maxValue * 1.1)];
+type VisibleLines = {
+  [K in VisibleLineKeys]: boolean;
 };
 
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
+type ChartElementType = {
+  dataKey: VisibleLineKeys;
+  Component: typeof Bar | typeof Line;
+  props: React.ComponentProps<typeof Bar> | React.ComponentProps<typeof Line>;
 };
+
+type VisibleLineKeys = Exclude<keyof ChartData, 'date'>;
 
 const formatXAxis = (tickItem: string) => {
   const date = new Date(tickItem);
@@ -45,7 +41,49 @@ const formatToMillions = (value: number) => {
   return value.toFixed(0);
 };
 
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value);
+};
+
+const CustomLegend: React.FC<{
+  payload: any[];
+  onClick: (dataKey: string) => void;
+  visibleLines: VisibleLines;
+}> = ({ payload, onClick, visibleLines }) => {
+  return (
+    <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+      {payload.map((entry, index) => (
+        <li
+          key={`item-${index}`}
+          style={{
+            marginRight: 20,
+            cursor: 'pointer',
+            opacity: visibleLines[entry.dataKey as keyof VisibleLines] ? 1 : 0.5,
+            textDecoration: visibleLines[entry.dataKey as keyof VisibleLines] ? 'none' : 'line-through',
+          }}
+          onClick={() => onClick(entry.dataKey)}
+        >
+          <span style={{ color: entry.color, marginRight: 5 }}>■</span>
+          {entry.value}
+        </li>
+      ))}
+    </ul>
+  );
+};
+
 const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, title }) => {
+  const [visibleLines, setVisibleLines] = useState<VisibleLines>({
+    token_usd_amount: true,
+    raw_change_in_usd: true,
+    incentives_per_day_usd: true,
+    weth_change_in_price_percentage: true
+  });
+
   const processedData = useMemo(() => {
     const validData = data.filter(item => !isNaN(new Date(item.date).getTime()));
     return validData.map((item, index) => ({
@@ -54,13 +92,58 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
     }));
   }, [data]);
 
-  const yAxisDomain = useMemo(() => calculateYAxisDomain(processedData), [processedData]);
+  const calculateYAxisDomain = useCallback((data: ChartData[], key: keyof VisibleLines) => {
+    if (!visibleLines[key]) return [0, 1]; // Default domain if series is inactive
+    const values = data.map(item => item[key] as number);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    return [Math.floor(minValue * 0.9), Math.ceil(maxValue * 1.1)];
+  }, [visibleLines]);
+
+  const leftYAxisDomain = useMemo(() => {
+    const domains = ['token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd']
+      .map(key => calculateYAxisDomain(processedData, key as keyof VisibleLines));
+    return [
+      Math.min(...domains.map(d => d[0])),
+      Math.max(...domains.map(d => d[1]))
+    ];
+  }, [processedData, calculateYAxisDomain]);
+
+  const rightYAxisDomain = useMemo(() => 
+    calculateYAxisDomain(processedData, 'weth_change_in_price_percentage'),
+  [processedData, calculateYAxisDomain]);
+
+  const handleLegendClick = useCallback((dataKey: string) => {
+    setVisibleLines(prev => ({
+      ...prev,
+      [dataKey]: !prev[dataKey as keyof VisibleLines]
+    }));
+  }, []);
+
+  const chartElements: ChartElementType[] = [
+    { dataKey: 'token_usd_amount', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#8884d8", name: "Pool TVL" } },
+    { dataKey: 'raw_change_in_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#82ca9d", name: "Pool Change Since Start" } },
+    { dataKey: 'incentives_per_day_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#ffc658", name: "Incentives per Day" } },
+    { dataKey: 'weth_change_in_price_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#ff7300", name: "WETH Price Change %", dot: false, strokeWidth: 3 } },
+  ];
+
+  const visibleData = useMemo(() => {
+    return processedData.map(entry => {
+      const newEntry: any = { date: entry.date };
+      Object.keys(visibleLines).forEach(key => {
+        if (visibleLines[key as keyof VisibleLines]) {
+          newEntry[key] = entry[key as keyof ChartData];
+        }
+      });
+      return newEntry;
+    });
+  }, [processedData, visibleLines]);
 
   return (
     <div className="single-chart">
       <h3>{title}</h3>
       <ResponsiveContainer width="100%" height={400}>
-        <ComposedChart data={processedData}>
+        <ComposedChart data={visibleData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 
             dataKey="date" 
@@ -73,34 +156,35 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
           <YAxis 
             yAxisId="left" 
             tickFormatter={formatToMillions}
+            domain={leftYAxisDomain}
             label={{ 
               value: 'USD (Millions)', 
               angle: -90, 
               position: 'outside',
               offset: 5,
-              dx: -28, // Adjust this value as needed
+              dx: -28,
             }}
           />
           <YAxis 
             yAxisId="right" 
             orientation="right" 
-            domain={yAxisDomain} 
+            domain={rightYAxisDomain}
             tickFormatter={(value) => `${value.toFixed(0)}%`}
             label={{ 
               value: 'WETH Price Change (%)', 
               angle: -90, 
               position: 'outside',
               offset: 5,
-              dx: 28, // Adjust this value as needed
+              dx: 28,
             }}
           />
           <Tooltip
-              contentStyle={{
-                backgroundColor: '#404040',
-                padding: '10px',
-                border: '1px solid #ccc',
-                borderRadius: '4px'
-              }}
+            contentStyle={{
+              backgroundColor: '#404040',
+              padding: '10px',
+              border: '1px solid #ccc',
+              borderRadius: '4px'
+            }}
             formatter={(value, name, props) => {
               switch (name) {
                 case "WETH Price Change %":
@@ -115,19 +199,26 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
             }}
             labelFormatter={(label) => `Date: ${new Date(label).toLocaleDateString()}`}
           />
-          <Legend />
-          <Bar yAxisId="left" dataKey="token_usd_amount" stackId="a" fill="#8884d8" name="Pool TVL" />
-          <Bar yAxisId="left" dataKey="raw_change_in_usd" stackId="a" fill="#82ca9d" name="Pool Change Since Start" />
-          <Bar yAxisId="left" dataKey="incentives_per_day_usd" stackId="a" fill="#ffc658" name="Incentives per Day" />
-          <Line 
-            yAxisId="right" 
-            type="monotone" 
-            dataKey="weth_change_in_price_percentage" 
-            stroke="#ff7300" 
-            name="WETH Price Change %" 
-            dot={false}
-            strokeWidth={3}
-          />
+          <Legend content={<CustomLegend 
+            payload={chartElements.map(el => ({ 
+              dataKey: el.dataKey, 
+              value: el.props.name as string, 
+              color: 'fill' in el.props ? el.props.fill : (el.props as React.ComponentProps<typeof Line>).stroke 
+            }))} 
+            onClick={handleLegendClick} 
+            visibleLines={visibleLines} 
+          />} />
+          {chartElements.map(({ dataKey, Component, props }) => (
+            React.createElement(
+              Component as React.ComponentType<typeof props>,
+              {
+                key: dataKey,
+                dataKey: dataKey,
+                ...props,
+                hide: !visibleLines[dataKey]
+              }
+            )
+          ))}
         </ComposedChart>
       </ResponsiveContainer>
     </div>
