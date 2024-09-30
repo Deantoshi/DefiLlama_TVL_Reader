@@ -784,7 +784,7 @@ def get_pool_tvl_incentives_and_change_in_weth_price():
     incentive_combo_list = get_incentive_combo_list()
     df = df[df['combo_name'].isin(incentive_combo_list)]
     
-    columns_to_keep = ['date', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage']
+    columns_to_keep = ['date', 'chain', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage']
     df = df[columns_to_keep]
     
     # Convert 'date' column to datetime, sort, and format to ISO 8601
@@ -793,9 +793,9 @@ def get_pool_tvl_incentives_and_change_in_weth_price():
     df['date'] = df['date'].dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
     
     result: Dict[str, List[Dict]] = {}
-    for name, group in df.groupby(['protocol', 'token', 'pool_type']):
-        key = f"{name[0]}|{name[1]}|{name[2]}"  # Create a string key
-        result[key] = group.drop(['protocol', 'token', 'pool_type'], axis=1).to_dict('records')
+    for name, group in df.groupby(['protocol', 'token', 'pool_type', 'chain']):
+        key = f"{name[0].capitalize()} {name[3].capitalize()}: {name[1].upper()} {name[2].capitalize()}"  # Create a string key
+        result[key] = group.drop(['protocol', 'token', 'pool_type', 'chain'], axis=1).to_dict('records')
     
     return jsonify(result)
 
