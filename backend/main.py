@@ -768,12 +768,17 @@ def get_incentive_combo_list() -> List[str]:
     )
     return incentive_history_df['combo_name'].unique().tolist()
 
+@lru_cache(maxsize=4)
+def cached_read_zip_csv_from_cloud_storage(filename, bucket_name):
+    print(f"Reading {filename} from {bucket_name}")  # To show when it's actually reading
+    return cs.read_zip_csv_from_cloud_storage(filename, bucket_name)
 
 
 # does as the name implies
 @app.route('/api/pool_tvl_incentives_and_change_in_weth_price', methods=['GET'])
 def get_pool_tvl_incentives_and_change_in_weth_price():
-    df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+    # df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+    df = cached_read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
     df['combo_name'] = df['chain'] + df['protocol'] + df['token'] + df['pool_type']
     
     incentive_combo_list = get_incentive_combo_list()

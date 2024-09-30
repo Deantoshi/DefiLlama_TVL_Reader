@@ -5,7 +5,7 @@ import axios from 'axios';
 import ComposedChartComponent from './ComboChart1.tsx';
 import LoadingAnimation from './LoadingAnimation';
 
-const api_url = 'http://localhost:8000';
+const api_url = 'https://superfest-api-dot-internal-website-427620.uc.r.appspot.com';
 
 interface ChartData {
   [key: string]: {

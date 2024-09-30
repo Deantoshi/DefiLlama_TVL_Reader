@@ -121,10 +121,10 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
   }, []);
 
   const chartElements: ChartElementType[] = [
-    { dataKey: 'token_usd_amount', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#8884d8", name: "Pool TVL" } },
+    { dataKey: 'token_usd_amount', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e8dab2", name: "Pool TVL" } },
     { dataKey: 'raw_change_in_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#82ca9d", name: "Pool Change Since Start" } },
-    { dataKey: 'incentives_per_day_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#ffc658", name: "Incentives per Day" } },
-    { dataKey: 'weth_change_in_price_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#ff7300", name: "WETH Price Change %", dot: false, strokeWidth: 3 } },
+    { dataKey: 'incentives_per_day_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e24343", name: "OP Incentives per Day" } },
+    { dataKey: 'weth_change_in_price_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#945bd6", name: "WETH Price Change %", dot: false, strokeWidth: 3 } },
   ];
 
   const visibleData = useMemo(() => {
@@ -158,7 +158,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
             tickFormatter={formatToMillions}
             domain={leftYAxisDomain}
             label={{ 
-              value: 'USD (Millions)', 
+              value: 'Dollars (USD)', 
               angle: -90, 
               position: 'outside',
               offset: 5,
@@ -191,7 +191,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
                   return [`${Number(value).toFixed(2)}%`, "WETH Price Change"];
                 case "Pool TVL":
                 case "Pool Change Since Start":
-                case "Incentives per Day":
+                case "OP Incentives per Day":
                   return [formatCurrency(Number(value)), name];
                 default:
                   return [value, name];
