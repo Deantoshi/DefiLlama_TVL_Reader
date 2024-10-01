@@ -1,2 +1,3 @@
 chain,platform,segment,partner,token,pool_type,protocol_slug,pool_id
 Optimism,Velodrome,AMM,Bedrock,UNIBTC-WBTC,AMM,velodrome,8eb2a7c9-419c-4fcf-9f75-d44dac8674c6
+Fraxtal,Curve,AMM,Renzo,EZETH-WFRXETH,AMM,curve-dex,45e82632-b504-4cb8-9fda-dfaedead081f

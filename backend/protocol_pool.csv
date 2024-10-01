@@ -1,4 +1,5 @@
 chain,platform,segment,partner,token,pool_type,protocol_slug
+Fraxtal,Curve,AMM,Renzo,EZETH-WFRXETH,AMM,curve-dex
 Optimism,Velodrome,AMM,Bedrock,UNIBTC-WBTC,AMM,velodrome
 Base,Aave,Lending,Aave,WETH,borrow,aave-v3
 Base,Aave,Lending,Aave,WEETH.BASE,supply,aave-v3
