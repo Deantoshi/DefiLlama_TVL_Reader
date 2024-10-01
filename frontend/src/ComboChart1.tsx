@@ -7,6 +7,7 @@ interface ChartData {
   raw_change_in_usd: number;
   incentives_per_day_usd: number;
   weth_change_in_price_percentage: number;
+  percentage_change_in_usd: number;
 }
 
 interface ChartProps {
@@ -81,14 +82,16 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
     token_usd_amount: true,
     raw_change_in_usd: true,
     incentives_per_day_usd: true,
-    weth_change_in_price_percentage: true
+    weth_change_in_price_percentage: true,
+    percentage_change_in_usd: true
   });
 
   const processedData = useMemo(() => {
     const validData = data.filter(item => !isNaN(new Date(item.date).getTime()));
     return validData.map((item, index) => ({
       ...item,
-      weth_change_in_price_percentage: index === 0 ? 0 : item.weth_change_in_price_percentage * 100
+      weth_change_in_price_percentage: index === 0 ? 0 : item.weth_change_in_price_percentage * 100,
+      percentage_change_in_usd: index === 0 ? 0 : item.percentage_change_in_usd * 100
     }));
   }, [data]);
 
@@ -109,9 +112,14 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
     ];
   }, [processedData, calculateYAxisDomain]);
 
-  const rightYAxisDomain = useMemo(() => 
-    calculateYAxisDomain(processedData, 'weth_change_in_price_percentage'),
-  [processedData, calculateYAxisDomain]);
+  const rightYAxisDomain = useMemo(() => {
+    const wethDomain = calculateYAxisDomain(processedData, 'weth_change_in_price_percentage');
+    const percentageDomain = calculateYAxisDomain(processedData, 'percentage_change_in_usd');
+    return [
+      Math.min(wethDomain[0], percentageDomain[0]),
+      Math.max(wethDomain[1], percentageDomain[1])
+    ];
+  }, [processedData, calculateYAxisDomain]);
 
   const handleLegendClick = useCallback((dataKey: string) => {
     setVisibleLines(prev => ({
@@ -124,7 +132,8 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
     { dataKey: 'token_usd_amount', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e8dab2", name: "Pool TVL" } },
     { dataKey: 'raw_change_in_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#82ca9d", name: "Pool Change Since Start" } },
     { dataKey: 'incentives_per_day_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e24343", name: "OP Incentives per Day" } },
-    { dataKey: 'weth_change_in_price_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#945bd6", name: "WETH Price Change %", dot: false, strokeWidth: 3 } },
+    { dataKey: 'weth_change_in_price_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#945bd6", name: "WETH Price Change Since Start", dot: false, strokeWidth: 3 } },
+    { dataKey: 'percentage_change_in_usd', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#F7931A", name: "TVL Change Since Start", dot: false, strokeWidth: 3 } },
   ];
 
   const visibleData = useMemo(() => {
@@ -158,7 +167,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
             tickFormatter={formatToMillions}
             domain={leftYAxisDomain}
             label={{ 
-              value: 'Dollars (USD)', 
+              value: 'TVL + Incentives ($)', 
               angle: -90, 
               position: 'outside',
               offset: 5,
@@ -171,7 +180,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
             domain={rightYAxisDomain}
             tickFormatter={(value) => `${value.toFixed(0)}%`}
             label={{ 
-              value: 'WETH Price Change (%)', 
+              value: 'TVL + WETH Change (%)', 
               angle: -90, 
               position: 'outside',
               offset: 5,
@@ -187,8 +196,9 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
             }}
             formatter={(value, name, props) => {
               switch (name) {
-                case "WETH Price Change %":
-                  return [`${Number(value).toFixed(2)}%`, "WETH Price Change"];
+                case "WETH Price Change Since Start":
+                case "TVL Change Since Start":
+                  return [`${Number(value).toFixed(2)}%`, name];
                 case "Pool TVL":
                 case "Pool Change Since Start":
                 case "OP Incentives per Day":

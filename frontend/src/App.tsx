@@ -5,7 +5,7 @@ import axios from 'axios';
 import ComposedChartComponent from './ComboChart1.tsx';
 import LoadingAnimation from './LoadingAnimation';
 
-const api_url = 'http://localhost:8000';
+const api_url = 'https://superfest-api-dot-internal-website-427620.uc.r.appspot.com';
 
 interface ChartData {
   [key: string]: {
@@ -14,6 +14,7 @@ interface ChartData {
     raw_change_in_usd: number;
     incentives_per_day_usd: number;
     weth_change_in_price_percentage: number;
+    percentage_change_in_usd: number;
   }[];
 }
 

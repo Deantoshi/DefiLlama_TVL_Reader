@@ -37,8 +37,8 @@ CLOUD_DATA_FILENAME = 'super_fest.zip'
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
-cors = CORS(app, origins='*')
-# CORS(app, resources={r"/api/*": {"origins": "https://frontend-dot-internal-website-427620.uc.r.appspot.com"}})
+# cors = CORS(app, origins='*')
+CORS(app, resources={r"/api/*": {"origins": "https://superfest-frontend-dot-internal-website-427620.uc.r.appspot.com"}})
 
 # Initialize GCP storage client
 # credentials, project = default()
@@ -784,7 +784,7 @@ def get_pool_tvl_incentives_and_change_in_weth_price():
     incentive_combo_list = get_incentive_combo_list()
     df = df[df['combo_name'].isin(incentive_combo_list)]
     
-    columns_to_keep = ['date', 'chain', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage']
+    columns_to_keep = ['date', 'chain', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage']
     df = df[columns_to_keep]
     
     # Convert 'date' column to datetime, sort, and format to ISO 8601
