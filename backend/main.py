@@ -37,8 +37,8 @@ CLOUD_DATA_FILENAME = 'super_fest.zip'
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
-# cors = CORS(app, origins='*')
-CORS(app, resources={r"/api/*": {"origins": "https://superfest-frontend-dot-internal-website-427620.uc.r.appspot.com"}})
+cors = CORS(app, origins='*')
+# CORS(app, resources={r"/api/*": {"origins": "https://superfest-frontend-dot-internal-website-427620.uc.r.appspot.com"}})
 
 # Initialize GCP storage client
 # credentials, project = default()
@@ -87,6 +87,26 @@ def get_historic_protocol_tvl_json(protocol_slug):
 
     return data
 
+# # does our DefiLlama API call for dex tvl history
+def get_historic_dex_tvl_json(pool_id):
+
+    url = "https://yields.llama.fi/chart/" + pool_id
+
+    # Send a GET request to the URL
+    response = requests.get(url)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        # Request was successful
+        data = response.json()  # Parse the JSON response
+    else:
+        # Request failed
+        print(f"Request failed with status code: {response.status_code}")
+        print(response.text)  # Print the response content for more info on the error
+
+    return data
+
+
 # # makes a dataframe for our usd_supplied amounts
 def get_historic_protocol_tvl_df(data, blockchain, category):
     # Extract the tokensInUsd list
@@ -119,6 +139,30 @@ def get_historic_protocol_tvl_df(data, blockchain, category):
 
     # df['timestamp'] = pd.to_datetime(df['timestamp'])
 
+    return df
+
+# # makes a dataframe for our usd_supplied amounts
+def get_historic_dex_tvl_df(data):
+    # Check if the input is a string (JSON) or a dictionary
+    if isinstance(data, str):
+        # If it's a string, parse it as JSON
+        data = json.loads(data)
+    
+    # Extract the list of data points
+    data_points = data['data']
+    
+    # Create DataFrame directly from the data points
+    df = pd.DataFrame(data_points)
+    
+    # Convert timestamp to datetime
+    df['timestamp'] = df['timestamp'].apply(lambda x: int(dt.strptime(x, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()))
+    
+    # Sort the DataFrame by timestamp
+    df = df.sort_values('timestamp')
+    
+    # Reset the index to have a standard numeric index
+    df = df.reset_index(drop=True)
+    
     return df
 
 # # simply turns our dataframe into a df adn goes ahead and casts our timestamp into a datetime data type
@@ -216,6 +260,10 @@ def get_pool_type_df(data, protocol_blockchain, pool_type):
         category = 'tokensInUsd'
         protocol_blockchain += '-borrowed'
         df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+
+    elif pool_type == 'AMM':
+        category = 'tokensInUsd'
+        df = get_historic_dex_tvl_df(data)
 
     return df
 
@@ -708,7 +756,13 @@ def run_all():
 
         # # we will only send another api ping if we are using a new slug
         if last_slug != protocol_slug:
-            data = get_historic_protocol_tvl_json(protocol_slug)
+            if pool_type == 'AMM':
+                old_protocol_slug = protocol_slug
+                protocol_slug = get_dex_pool_pool_id(protocol_slug)
+                data = get_historic_dex_tvl_json(protocol_slug)
+                protocol_slug = old_protocol_slug
+            else:
+                data = get_historic_protocol_tvl_json(protocol_slug)
             time.sleep(COOLDOWN_TIME)
         
         else:
@@ -716,9 +770,16 @@ def run_all():
 
         # if last_pool_type != pool_type:
         df = get_pool_type_df(data, protocol_blockchain, pool_type)
+        df.to_csv('test_test.csv', index=False)
         df = filter_start_timestamp(df, start_unix)
         df['pool_type'] = pool_type
-        df = transpose_df(df)
+        if pool_type != 'AMM':
+            df = transpose_df(df)
+        elif pool_type == 'AMM':
+            df['token'] = token
+            df = df.rename(columns={'tvlUsd': 'token_amount'})
+            df = df[['timestamp', 'token', 'token_amount', 'pool_type']]
+
         df = add_start_token_amount_column(df)
         df = add_change_in_token_amounts(df)
 
@@ -741,6 +802,7 @@ def run_all():
         i += 1
 
     df = pd.concat(df_list)
+
     df = df_token_cleanup(protocol_df, df)
     incentive_df = get_incentive_df()
     df = combine_incentives_with_tvl(df, incentive_df)
@@ -777,8 +839,8 @@ def cached_read_zip_csv_from_cloud_storage(filename, bucket_name):
 # does as the name implies
 @app.route('/api/pool_tvl_incentives_and_change_in_weth_price', methods=['GET'])
 def get_pool_tvl_incentives_and_change_in_weth_price():
-    # df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
-    df = cached_read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+    df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+    # df = cached_read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
     df['combo_name'] = df['chain'] + df['protocol'] + df['token'] + df['pool_type']
     
     incentive_combo_list = get_incentive_combo_list()
@@ -799,5 +861,27 @@ def get_pool_tvl_incentives_and_change_in_weth_price():
     
     return jsonify(result)
 
+# # does as the name implies
+def get_dex_pool_config():
+    df = pd.read_csv('dex_pool_config.csv')
+
+    return df
+
+# # takes a slug and gives bakc a pool_id
+def get_dex_pool_pool_id(protocol_slug):
+
+    dex_config_df = get_dex_pool_config()
+
+    dex_config_df = dex_config_df.loc[dex_config_df['protocol_slug'] == protocol_slug]
+
+    pool_id = dex_config_df['pool_id'].unique()[0]
+
+    return pool_id
+
 if __name__ == '__main__':
     app.run(use_reloader=True, port=8000, threaded=True, DEBUG=True)
+
+# run_all()
+# df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+# print(df)
+# df.to_csv('test_test.csv', index=False)
