@@ -13,7 +13,7 @@ Mode,Velodrome,supply,Velodrome,WETH,supply,velodrome-v2
 Base,Uniswap,AMM,Uniswap,WSTETH,supply,uniswap-v3
 Base,Uniswap,AMM,Uniswap,WEETH.BASE,supply,uniswap-v3
 Base,Uniswap,AMM,Uniswap,WETH,supply,uniswap-v3
-Base,Toros,Other,Toros,SUSDCY,AMM,toros
+Base,Toros,Yield_Vault,Toros,SUSDCY,AMM,toros
 Optimism,Sturdy,Lending,Sturdy,WETH,supply,sturdy-v2
 Mode,Sturdy,Lending,Sturdy,WETH,supply,sturdy-v2
 Mode,Splice,Lending,Splice,WEETH.M,supply,splice-finance

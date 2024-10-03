@@ -788,6 +788,13 @@ def get_aggregate_top_level_df(df):
 
     return aggregated_df
 
+# # will remove protocols that are missing a lot of data
+def clean_up_bad_data_protocols(df):
+
+    df = df.loc[df['incentives_per_day'] < df['token_usd_amount']]
+
+    return df
+
 @app.route('/api/update_data', methods=['GET'])
 def run_all():
     protocol_df = get_protocol_pool_config_df()
@@ -891,6 +898,10 @@ def run_all():
 
     merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
 
+    merged_df = clean_up_bad_data_protocols(merged_df)
+
+    merged_df = fix_protocol_segments(merged_df)
+
     aggregate_df = get_aggregate_top_level_df(merged_df)
 
     cs.df_write_to_cloud_storage_as_zip(merged_df, CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
@@ -948,6 +959,20 @@ def get_dex_pool_config():
 
     return df
 
+def fix_protocol_segments(df):
+
+    protocol_fix_list = ['extra-finance', 'morpho-blue', 'toros']
+
+    protocol_pool_df = get_protocol_pool_config_df()
+
+    for protocol in protocol_fix_list:
+        temp_pool_df = protocol_pool_df.loc[protocol_pool_df['protocol_slug'] == protocol]
+        pool_type = temp_pool_df['segment'].unique()[0]
+
+        df.loc[df['protocol'] == protocol, 'pool_type'] = pool_type
+
+    return df
+
 # # takes a slug and gives bakc a pool_id
 def get_dex_pool_pool_id(protocol_slug):
 
@@ -972,8 +997,6 @@ if __name__ == '__main__':
 # print('Finished in: ', end_time - start_time)
 
 # df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
-# df = get_aggregate_top_level_df(df)
-
-# df = df.loc[df['protocol'] == 'aave-v3']
+# # df = df.loc[df['protocol'] == 'aave-v3']
 # print(df)
 # df.to_csv('test_test.csv', index=False)
