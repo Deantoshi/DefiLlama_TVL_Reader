@@ -250,11 +250,18 @@ def get_pool_type_df(data, protocol_blockchain, pool_type):
     if pool_type == 'supply':
         category = 'tokensInUsd'
         df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
-        pool_type = 'borrow'
-        protocol_blockchain += '-borrowed'
-        borrow_df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+        print(df)
+        try:
+            pool_type = 'borrow'
+            protocol_blockchain += '-borrowed'
+            borrow_df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+            print(borrow_df)
 
-        df = add_dataframes(df, borrow_df)
+            df = add_dataframes(df, borrow_df)
+        except:
+            print('could not add supply and borrow dataframes')
+
+        print(df)
 
     elif pool_type == 'borrow':
         category = 'tokensInUsd'
@@ -290,24 +297,44 @@ def add_dataframes(df1, df2):
     df1 = df1.set_index('timestamp')
     df2 = df2.set_index('timestamp')
 
-    # List of token columns (excluding 'timestamp')
-    token_columns = [col for col in df1.columns if col != 'timestamp']
-    token_columns_2 = [col for col in df2.columns if col != 'timestamp']
+    # Get all unique columns from both dataframes
+    all_columns = list(set(df1.columns) | set(df2.columns))
 
-    # # shared token columns
-    token_columns = list(set(token_columns) & set(token_columns_2))
-
-    df1 = df1[token_columns]
-    df2 = df2[token_columns]
-
+    # Fill missing columns with 0
+    df1 = df1.reindex(columns=all_columns, fill_value=0)
+    df2 = df2.reindex(columns=all_columns, fill_value=0)
 
     # Add the dataframes
-    result = df1[token_columns].add(df2[token_columns], fill_value=0)
+    result = df1.add(df2, fill_value=0)
 
     # Reset the index to make 'timestamp' a column again
     result = result.reset_index()
 
     return result
+
+# def add_dataframes(df1, df2):
+#     # Ensure both dataframes have the same index
+#     df1 = df1.set_index('timestamp')
+#     df2 = df2.set_index('timestamp')
+
+#     # List of token columns (excluding 'timestamp')
+#     token_columns = [col for col in df1.columns if col != 'timestamp']
+#     token_columns_2 = [col for col in df2.columns if col != 'timestamp']
+
+#     # # shared token columns
+#     token_columns = list(set(token_columns) & set(token_columns_2))
+
+#     df1 = df1[token_columns]
+#     df2 = df2[token_columns]
+
+
+#     # Add the dataframes
+#     result = df1[token_columns].add(df2[token_columns], fill_value=0)
+
+#     # Reset the index to make 'timestamp' a column again
+#     result = result.reset_index()
+
+#     return result
 
 # # transposes our token columns
 def transpose_df(df):
@@ -753,7 +780,9 @@ def run_all():
         pool_type = pool_type_list[i]
         token = token_list[i]
         chain = chain_list[i]
-
+        
+        if chain == 'Mode':
+            print('Here')
         # # we will only send another api ping if we are using a new slug
         if last_slug != protocol_slug:
             if pool_type == 'AMM':
@@ -765,12 +794,27 @@ def run_all():
                 data = get_historic_protocol_tvl_json(protocol_slug)
             time.sleep(COOLDOWN_TIME)
         
+        elif pool_type != last_pool_type:
+            if pool_type == 'AMM':
+                old_protocol_slug = protocol_slug
+                protocol_slug = get_dex_pool_pool_id(protocol_slug)
+                data = get_historic_dex_tvl_json(protocol_slug)
+                protocol_slug = old_protocol_slug
+            else:
+                data = get_historic_protocol_tvl_json(protocol_slug)
+            time.sleep(COOLDOWN_TIME)
+        # print(data)
+        # Write the API response to a JSON file
+        # with open('contango_api_response.json', 'w') as file:
+        #     json.dump(data, file, indent=4)
+
         else:
             pass
 
         # if last_pool_type != pool_type:
         df = get_pool_type_df(data, protocol_blockchain, pool_type)
-        df.to_csv('test_test.csv', index=False)
+        # print(df)
+        # df.to_csv('test_test.csv', index=False)
         df = filter_start_timestamp(df, start_unix)
         df['pool_type'] = pool_type
         if pool_type != 'AMM':
@@ -839,8 +883,8 @@ def cached_read_zip_csv_from_cloud_storage(filename, bucket_name):
 # does as the name implies
 @app.route('/api/pool_tvl_incentives_and_change_in_weth_price', methods=['GET'])
 def get_pool_tvl_incentives_and_change_in_weth_price():
-    df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
-    # df = cached_read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+    # df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+    df = cached_read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
     df['combo_name'] = df['chain'] + df['protocol'] + df['token'] + df['pool_type']
     
     incentive_combo_list = get_incentive_combo_list()
@@ -878,10 +922,19 @@ def get_dex_pool_pool_id(protocol_slug):
 
     return pool_id
 
-if __name__ == '__main__':
-    app.run(use_reloader=True, port=8000, threaded=True, DEBUG=True)
+# if __name__ == '__main__':
+#     app.run(use_reloader=True, port=8000, threaded=True, DEBUG=True)
 
+start_time = time.time()
 # run_all()
-# df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
-# print(df)
-# df.to_csv('test_test.csv', index=False)
+# try:
+#     run_all()
+# except:
+#     pass
+# end_time = time.time()
+# print('Finished in: ', end_time - start_time)
+
+df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+df = df.loc[df['protocol'] == 'velodrome-v2']
+print(df)
+df.to_csv('test_test.csv', index=False)
