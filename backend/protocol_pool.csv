@@ -3,7 +3,6 @@ Base,Aave,Lending,Etherfi,WEETH.BASE,borrow,aave-v3
 Base,Aave,Lending,Aave,WETH,borrow,aave-v3
 Base,Aave,Lending,Etherfi,WEETH.BASE,supply,aave-v3
 Base,Aave,Lending,Aave,WETH,supply,aave-v3
-Optimism,Velodrome,AMM,Renzo,WSTETH-EZETH,AMM,velodrome-v3
 Optimism,Velodrome,AMM,Bedrock,UNIBTC-WBTC,AMM,velodrome-v2
 Mode,Velodrome,supply,Velodrome,EZETH,supply,velodrome-v2
 Mode,Velodrome,supply,Stakestone,STONE,supply,velodrome-v2
