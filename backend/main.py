@@ -959,8 +959,8 @@ def get_dex_pool_pool_id(protocol_slug):
 
     return pool_id
 
-# if __name__ == '__main__':
-#     app.run(use_reloader=True, port=8000, threaded=True, DEBUG=True)
+if __name__ == '__main__':
+    app.run(use_reloader=True, port=8000, threaded=True, DEBUG=True)
 
 # start_time = time.time()
 # run_all()
@@ -971,9 +971,9 @@ def get_dex_pool_pool_id(protocol_slug):
 # end_time = time.time()
 # print('Finished in: ', end_time - start_time)
 
-df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
-df = get_aggregate_top_level_df(df)
+# df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+# df = get_aggregate_top_level_df(df)
 
 # df = df.loc[df['protocol'] == 'aave-v3']
-print(df)
-df.to_csv('test_test.csv', index=False)
+# print(df)
+# df.to_csv('test_test.csv', index=False)

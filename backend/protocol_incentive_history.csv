@@ -1,7 +1,4 @@
 chain,platform,segment,partner,token,pool_type,protocol_slug,date,epoch_token_incentives
-Base,Aave,Lending,Lido,WSTETH,AMM,aave-v3,2024-08-20,20000
-Base,Aave,Lending,Aave,USDC,AMM,aave-v3,2024-07-09,8795
-Base,Aave,Lending,Aave,USDC,AMM,aave-v3,2024-07-23,2500
 Base,Aave,Lending,Aave,WETH,supply,aave-v3,2024-08-06,39144
 Base,Aave,Lending,Aave,WETH,supply,aave-v3,2024-08-20,52234
 Base,Aave,Lending,Aave,WETH,borrow,aave-v3,2024-07-09,3818

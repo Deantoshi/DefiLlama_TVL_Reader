@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import cod3xLogo from './assets/cod3x.jpg';
 import './App.css';
 import axios from 'axios';
@@ -22,6 +22,7 @@ function App() {
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedProtocol, setSelectedProtocol] = useState<string>('Aave-v3');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,20 +40,44 @@ function App() {
     fetchData();
   }, []);
 
+  const protocols = useMemo(() => {
+    if (!chartData) return ['Aave-v3'];
+    const protocolSet = new Set(['Aave-v3', ...Object.keys(chartData).map(key => key.split(' ')[0])]);
+    return Array.from(protocolSet);
+  }, [chartData]);
+
+  const filteredChartData = useMemo(() => {
+    if (!chartData) return null;
+    return Object.fromEntries(
+      Object.entries(chartData).filter(([key]) => key.startsWith(selectedProtocol))
+    );
+  }, [chartData, selectedProtocol]);
+
   return (
     <div className="App">
       <header className="App-header">
-        {/* <img src={cod3xLogo} className="App-logo" alt="logo" /> */}
         <h1>Superfest Analytics Dashboard</h1>
       </header>
       <main className="main-content">
+        <div className="protocol-selector">
+          <label htmlFor="protocol-select">Select an App: </label>
+          <select 
+            id="protocol-select"
+            value={selectedProtocol}
+            onChange={(e) => setSelectedProtocol(e.target.value)}
+          >
+            {protocols.map(protocol => (
+              <option key={protocol} value={protocol}>{protocol}</option>
+            ))}
+          </select>
+        </div>
         <div className="chart-container">
           {isLoading ? (
             <LoadingAnimation />
           ) : error ? (
             <div className="error-message">{error}</div>
-          ) : chartData ? (
-            <ComposedChartComponent data={chartData} />
+          ) : filteredChartData ? (
+            <ComposedChartComponent data={filteredChartData} />
           ) : (
             <div>No data available</div>
           )}
