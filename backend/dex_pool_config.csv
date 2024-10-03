@@ -1,4 +1,6 @@
 chain,platform,segment,partner,token,pool_type,protocol_slug,pool_id
+Base,Aave,Lending,Aave,USDC,AMM,aave-v3,7e0661bf-8cf3-45e6-9424-31916d4c7b84
+Base,Aave,Lending,Lido,WSTETH,AMM,aave-v3,361f0a3c-6adb-4b1c-bf35-f9cd79f2341c
 Optimism,Velodrome,AMM,Bedrock,UNIBTC-WBTC,AMM,velodrome-v2,8eb2a7c9-419c-4fcf-9f75-d44dac8674c6
 Base,Toros,Other,Toros,SUSDCY,AMM,toros,3e137f9a-97bc-4d3a-81d4-b342125fc262
 Base,Morpho,Lending,Morpho,WSTETH-WETH,AMM,morpho-blue,046c6e4e-4c0c-4b42-9c9c-43364e470c03

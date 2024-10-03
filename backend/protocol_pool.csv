@@ -1,4 +1,10 @@
 chain,platform,segment,partner,token,pool_type,protocol_slug
+Base,Aave,Lending,Aave,USDC,AMM,aave-v3
+Base,Aave,Lending,Etherfi,WEETH.BASE,borrow,aave-v3
+Base,Aave,Lending,Lido,WSTETH,AMM,aave-v3
+Base,Aave,Lending,Aave,WETH,borrow,aave-v3
+Base,Aave,Lending,Etherfi,WEETH.BASE,supply,aave-v3
+Base,Aave,Lending,Aave,WETH,supply,aave-v3
 Optimism,Velodrome,AMM,Bedrock,UNIBTC-WBTC,AMM,velodrome-v2
 Mode,Velodrome,supply,Velodrome,EZETH,supply,velodrome-v2
 Mode,Velodrome,supply,Stakestone,STONE,supply,velodrome-v2
@@ -16,7 +22,6 @@ Mode,Splice,Lending,Splice,WEETH.M,supply,splice-finance
 Mode,Splice,Lending,Splice,EZETH,supply,splice-finance
 Optimism,Silo,Lending,Silo,WETH,borrow,silo-finance
 Optimism,Silo,Lending,Bedrock,UNIBTC,supply,silo-finance
-Optimism,Silo,Lending,Renzo,EZETH,supply,silo-finance
 Optimism,Silo,Lending,Silo,WETH,supply,silo-finance
 Optimism,Silo,Lending,Renzo,SFRXETH,supply,silo-finance
 Optimism,Silo,Lending,Renzo,WSTETH,supply,silo-finance
@@ -31,14 +36,10 @@ Base,Morpho,Lending,Etherfi,WEETH-USDC,AMM,morpho-blue
 Base,Morpho,Lending,Morpho,EZETH-USDC,AMM,morpho-blue
 Base,Morpho,Lending,Morpho,CBETH-USDC,AMM,morpho-blue
 Base,Morpho,Lending,Morpho,WUSD+-USDC,AMM,morpho-blue
-Base,Moonwell,Lending,Moonwell,USDC,supply,moonwell
 Mode,Ionic,Lending,Ionic,USDC,supply,ionic-protocol
 Mode,Ionic,Lending,Stakestone,STONE,supply,ionic-protocol
 Mode,Ionic,Lending,Ionic,EZETH,supply,ionic-protocol
 Mode,Ionic,Lending,Ionic,WETH,supply,ionic-protocol
-Optimism,Gearbox,Lending,Gearbox,USDC,supply,gearbox
-Optimism,Gearbox,Lending,Gearbox,WETH,supply,gearbox
-Optimism,Gearbox,Lending,Gearbox,EZETH,supply,gearbox
 Fraxtal,Fraxlend,Lending,Fraxlend,SFRXETH,supply,fraxlend
 Base,Fluid,Lending,Fluid,USDC,supply,fluid
 Base,ExtraFi,Lending,ExtraFi,WSTETH,AMM,extra-finance
@@ -47,11 +48,3 @@ Fraxtal,Curve,AMM,Curve,FRAX-WFRXETH-FXS,AMM,curve-dex
 Fraxtal,Curve,AMM,Curve,CRVUSD-WFRXETH-CRV,AMM,curve-dex
 Fraxtal,Curve,AMM,Curve,CRVUSD-FRAX,AMM,curve-dex
 Fraxtal,Curve,AMM,Renzo,EZETH-WFRXETH,AMM,curve-dex
-Base,Contango,Lending,Contango,WSTETH,supply,contango-v2
-Base,Contango,Lending,Contango,WEETH.BASE,supply,contango-v2
-Base,Contango,Lending,Contango,RETH,supply,contango-v2
-Base,Contango,Lending,Contango,EZETH,supply,contango-v2
-Base,Contango,Lending,Contango,CBETH,supply,contango-v2
-Base,Aave,Lending,Aave,WETH,borrow,aave-v3
-Base,Aave,Lending,Aave,WEETH.BASE,supply,aave-v3
-Base,Aave,Lending,Aave,WETH,supply,aave-v3
