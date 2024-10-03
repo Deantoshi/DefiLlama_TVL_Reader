@@ -32,6 +32,7 @@ WETH_TOKEN_ADDRESS = '0x4200000000000000000000000000000000000006'
 CLOUD_BUCKET_NAME = 'cooldowns2'
 CLOUD_PRICE_FILENAME = 'token_prices.zip'
 CLOUD_DATA_FILENAME = 'super_fest.zip'
+CLOUD_AGGREGATE_FILENAME = 'super_fest_aggregate.zip'
 
 # logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -250,7 +251,6 @@ def get_pool_type_df(data, protocol_blockchain, pool_type):
     if pool_type == 'supply':
         category = 'tokensInUsd'
         df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
-        print(df)
         try:
             pool_type = 'borrow'
             protocol_blockchain += '-borrowed'
@@ -261,7 +261,6 @@ def get_pool_type_df(data, protocol_blockchain, pool_type):
         except:
             print('could not add supply and borrow dataframes')
 
-        print(df)
 
     elif pool_type == 'borrow':
         category = 'tokensInUsd'
@@ -386,6 +385,7 @@ def add_change_in_token_amounts(df):
     df['raw_change_in_usd'] = df['token_amount'] - df['start_token_amount']
     df['percentage_change_in_usd'] = (df['token_amount'] / df['start_token_amount'] - 1)
 
+    df = df.loc[df['percentage_change_in_usd'] > -0.99]
     # Fill NaN values with 0 in the entire DataFrame
     df = df.fillna(0)
                    
@@ -755,6 +755,39 @@ def merge_tvl_and_weth_dfs(tvl_df, weth_df):
     return merged_df
 
 
+# # makes our top level aggreagate dafarame
+def get_aggregate_top_level_df(df):
+    
+    df[['token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'op_price', 'incentives_per_day_usd', 'weth_price', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage']] = df[['token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'op_price', 'incentives_per_day_usd', 'weth_price', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage']].astype(float)
+    # Group by day and aggregate the specified columns
+    aggregated_df = df.groupby(df['date']).agg({
+        'token_usd_amount': 'sum',
+        'start_token_usd_amount': 'sum',
+        'raw_change_in_usd': 'sum',
+        'daily_tvl': 'sum',
+        'epoch_token_incentives': 'sum',
+        'incentives_per_day': 'sum',
+        'op_price': 'max',
+        'incentives_per_day_usd': 'sum',
+        'symbol': 'first',
+        'weth_price': 'min',
+        'weth_start_price': 'min',
+        'weth_change_in_price_usd': 'min',
+        'weth_change_in_price_percentage': 'min'
+    }).reset_index()
+    
+    min_start_tvl = aggregated_df['start_token_usd_amount'].min()
+    aggregated_df['start_token_usd_amount'] = min_start_tvl
+    aggregated_df['raw_change_in_usd'] = aggregated_df['token_usd_amount'] - aggregated_df['start_token_usd_amount']
+
+    aggregated_df['percentage_change_in_usd'] = (aggregated_df['token_usd_amount'] / aggregated_df['start_token_usd_amount'] - 1)
+
+    aggregated_df['cumulative_incentives_usd'] = aggregated_df['incentives_per_day_usd'].cumsum()
+
+    aggregated_df['tvl_to_incentive_roi_percentage'] = aggregated_df['raw_change_in_usd'] / aggregated_df['cumulative_incentives_usd']
+
+    return aggregated_df
+
 @app.route('/api/update_data', methods=['GET'])
 def run_all():
     protocol_df = get_protocol_pool_config_df()
@@ -858,7 +891,11 @@ def run_all():
 
     merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
 
+    aggregate_df = get_aggregate_top_level_df(merged_df)
+
     cs.df_write_to_cloud_storage_as_zip(merged_df, CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+
+    cs.df_write_to_cloud_storage_as_zip(aggregate_df, CLOUD_AGGREGATE_FILENAME, CLOUD_BUCKET_NAME)
     
     return jsonify({"status": 200}), 200
 
@@ -874,7 +911,7 @@ def get_incentive_combo_list() -> List[str]:
     )
     return incentive_history_df['combo_name'].unique().tolist()
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=100)
 def cached_read_zip_csv_from_cloud_storage(filename, bucket_name):
     print(f"Reading {filename} from {bucket_name}")  # To show when it's actually reading
     return cs.read_zip_csv_from_cloud_storage(filename, bucket_name)
@@ -925,7 +962,7 @@ def get_dex_pool_pool_id(protocol_slug):
 # if __name__ == '__main__':
 #     app.run(use_reloader=True, port=8000, threaded=True, DEBUG=True)
 
-start_time = time.time()
+# start_time = time.time()
 # run_all()
 # try:
 #     run_all()
@@ -935,6 +972,8 @@ start_time = time.time()
 # print('Finished in: ', end_time - start_time)
 
 df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
-df = df.loc[df['protocol'] == 'velodrome-v2']
+df = get_aggregate_top_level_df(df)
+
+# df = df.loc[df['protocol'] == 'aave-v3']
 print(df)
 df.to_csv('test_test.csv', index=False)
