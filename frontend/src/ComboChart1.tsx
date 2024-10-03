@@ -34,12 +34,16 @@ const formatXAxis = (tickItem: string) => {
 };
 
 const formatToMillions = (value: number) => {
-  if (value >= 1000000) {
-    return `${(value / 1000000).toFixed(0)}M`;
-  } else if (value >= 1000) {
-    return `${(value / 1000).toFixed(0)}K`;
+  const absValue = Math.abs(value);
+  let formattedValue: string;
+  if (absValue >= 1000000) {
+    formattedValue = `${(absValue / 1000000).toFixed(0)}M`;
+  } else if (absValue >= 1000) {
+    formattedValue = `${(absValue / 1000).toFixed(0)}K`;
+  } else {
+    formattedValue = absValue.toFixed(1);
   }
-  return value.toFixed(0);
+  return value < 0 ? `-${formattedValue}` : formattedValue;
 };
 
 const formatCurrency = (value: number): string => {
