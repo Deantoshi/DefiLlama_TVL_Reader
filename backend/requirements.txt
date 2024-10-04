@@ -15,4 +15,4 @@ google-resumable-media
 googleapis-common-protos
 flask
 flask-CORS
-flask_limiter
+Flask-Limiter

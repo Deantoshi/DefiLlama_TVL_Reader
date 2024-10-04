@@ -152,7 +152,7 @@ function App() {
             className="x-button"
           >
             <XLogo size={24} color="white" />
-            <span>Built by Deantoshi</span>
+            <span>Built by 0xDeantoshi</span>
           </a>
         </div>
       </footer>
