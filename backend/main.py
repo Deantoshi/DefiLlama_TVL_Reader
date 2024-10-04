@@ -759,6 +759,10 @@ def merge_tvl_and_weth_dfs(tvl_df, weth_df):
 def get_aggregate_top_level_df(df):
     
     df[['token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'op_price', 'incentives_per_day_usd', 'weth_price', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage']] = df[['token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'op_price', 'incentives_per_day_usd', 'weth_price', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage']].astype(float)
+    df['date'] = pd.to_datetime(df['date'])
+
+    print(df.dtypes)
+
     # Group by day and aggregate the specified columns
     aggregated_df = df.groupby(df['date']).agg({
         'token_usd_amount': 'sum',
@@ -776,7 +780,9 @@ def get_aggregate_top_level_df(df):
         'weth_change_in_price_percentage': 'min'
     }).reset_index()
     
-    min_start_tvl = aggregated_df['start_token_usd_amount'].min()
+    # # tried changing this one
+    min_start_tvl = aggregated_df['token_usd_amount'].tolist()[0]
+
     aggregated_df['start_token_usd_amount'] = min_start_tvl
     aggregated_df['raw_change_in_usd'] = aggregated_df['token_usd_amount'] - aggregated_df['start_token_usd_amount']
 
@@ -996,7 +1002,8 @@ if __name__ == '__main__':
 # end_time = time.time()
 # print('Finished in: ', end_time - start_time)
 
-# df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+# df = cs.read_zip_csv_from_cloud_storage(CLOUD_AGGREGATE_FILENAME, CLOUD_BUCKET_NAME)
+# df = get_aggregate_top_level_df(df)
 # # df = df.loc[df['protocol'] == 'aave-v3']
 # print(df)
 # df.to_csv('test_test.csv', index=False)
