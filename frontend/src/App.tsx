@@ -60,20 +60,19 @@ function App() {
         <h1>Superfest Analytics Dashboard</h1>
       </header>
       <main className="main-content">
-        <div className="protocol-selector">
-          <label htmlFor="protocol-select">Select an App: </label>
-          <select 
-            id="protocol-select"
-            value={selectedProtocol}
-            onChange={(e) => setSelectedProtocol(e.target.value)}
-          >
-            {protocols.map(protocol => (
-              <option key={protocol} value={protocol}>{protocol}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-
+        <div className="protocol-selector-container">
+          <div className="protocol-selector">
+            <label htmlFor="protocol-select">Select an App: </label>
+            <select 
+              id="protocol-select"
+              value={selectedProtocol}
+              onChange={(e) => setSelectedProtocol(e.target.value)}
+            >
+              {protocols.map(protocol => (
+                <option key={protocol} value={protocol}>{protocol}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="chart-container">
           {isLoading ? (
