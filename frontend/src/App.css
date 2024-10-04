@@ -190,3 +190,29 @@
   padding: 5px;
   font-size: 16px;
 }
+.App-footer {
+  margin-top: 2rem;
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.x-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #000000;
+  color: white;
+  text-decoration: none;
+  border-radius: 9999px;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.x-button:hover {
+  background-color: #333333;
+}
+
+.x-button svg {
+  margin-right: 8px;
+}

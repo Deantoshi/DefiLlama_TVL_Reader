@@ -56,6 +56,14 @@ const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
+const formatPercentage = (value: number): string => {
+    const absValue = Math.abs(value);
+    if (absValue >= 1000) {
+      return `${Number(value.toFixed(2)).toLocaleString()}%`;
+    }
+    return `${value.toFixed(2)}%`;
+  };
+
 interface CustomLegendProps {
     payload?: Array<{dataKey: string; value: string; color: string}>;
     onClick: (dataKey: string) => void;
@@ -211,7 +219,7 @@ interface CustomLegendProps {
                 case "WETH Price Change Since Start":
                 case "TVL Change Since Start":
                 case "TVL to Incentive ROI":
-                  return [`${Number(value).toFixed(2)}%`, name];
+                  return [formatPercentage(Number(value)), name];
                 case "Pool TVL":
                 case "Pool Change Since Start":
                 case "Cumulative OP Incentives":

@@ -8,6 +8,13 @@ import AggregateChart from './AggregateChart';
 
 const api_url = 'http://localhost:8000';
 
+// Custom X logo component
+const XLogo = ({ size = 24, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" fill={color} />
+  </svg>
+);
+
 interface ComposedChartData {
   [key: string]: {
     date: string;
@@ -47,7 +54,10 @@ function App() {
           axios.get<ComposedChartData>(`${api_url}/api/pool_tvl_incentives_and_change_in_weth_price`),
           axios.get<AggregateChartData>(`${api_url}/api/aggregate_data`)
         ]);
-        setComposedChartData(poolResponse.data);
+        
+        // Transform the data for morpho-blue
+        const transformedPoolData = transformPoolData(poolResponse.data);
+        setComposedChartData(transformedPoolData);
         
         // Combine all aggregate data into a single array under a new key
         const combinedAggregateData = Object.values(aggregateResponse.data).flat();
@@ -65,6 +75,24 @@ function App() {
 
     fetchData();
   }, []);
+
+  const transformPoolData = (data: ComposedChartData): ComposedChartData => {
+    const transformedData: ComposedChartData = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      if (key.startsWith('Morpho-blue')) {
+        const newKey = key.replace('Amm', 'Lending_Pool');
+        transformedData[newKey] = value;
+      } else if (key.startsWith('Toros')) {
+        const newKey = key.replace('Amm', 'Yield_Vault');
+        transformedData[newKey] = value;
+      } else {
+        transformedData[key] = value;
+      }
+    }
+    
+    return transformedData;
+  };
 
   const protocols = useMemo(() => {
     if (!composedChartData) return ['Aggregate'];
@@ -88,7 +116,7 @@ function App() {
       <main className="main-content">
         <div className="protocol-selector-container">
           <div className="protocol-selector">
-            <label htmlFor="protocol-select">Select View: </label>
+            <label htmlFor="protocol-select">Select a Protocol: </label>
             <select 
               id="protocol-select"
               value={selectedView}
@@ -114,6 +142,17 @@ function App() {
           )}
         </div>
       </main>
+      <footer className="App-footer">
+        <a 
+          href="https://twitter.com/0xDeantoshi" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="x-button"
+        >
+          <XLogo size={24} color="white" />
+          <span>Built by Deantoshi</span>
+        </a>
+        </footer>
     </div>
   );
 }
