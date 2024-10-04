@@ -6,7 +6,7 @@ import ComposedChartComponent from './ComboChart1';
 import LoadingAnimation from './LoadingAnimation';
 import AggregateChart from './AggregateChart';
 
-const api_url = 'http://localhost:8000';
+const api_url = 'https://superfest-api-dot-internal-website-427620.uc.r.appspot.com';
 
 // Custom X logo component
 const XLogo = ({ size = 24, color = 'currentColor' }) => (
@@ -143,16 +143,19 @@ function App() {
         </div>
       </main>
       <footer className="App-footer">
-        <a 
-          href="https://twitter.com/0xDeantoshi" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="x-button"
-        >
-          <XLogo size={24} color="white" />
-          <span>Built by Deantoshi</span>
-        </a>
-        </footer>
+        <div className="footer-content">
+          <p className="footer-note">* Only pools that were integrated with DefiLlama prior to Superfest are tracked</p>
+          <a 
+            href="https://twitter.com/0xDeantoshi" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="x-button"
+          >
+            <XLogo size={24} color="white" />
+            <span>Built by Deantoshi</span>
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }

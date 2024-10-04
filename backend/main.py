@@ -8,6 +8,8 @@ import json
 from cloud_storage import cloud_storage as cs
 from flask import Flask, send_from_directory, send_file, make_response, jsonify, url_for, Response, stream_with_context
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import os
 from google.cloud import storage
 from google.cloud.exceptions import NotFound
@@ -44,6 +46,13 @@ cors = CORS(app, origins='*')
 # Initialize GCP storage client
 # credentials, project = default()
 # storage_client = storage.Client(credentials=credentials, project=project)
+
+# Initialize the rate limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+limiter.init_app(app)
 
 def get_protocol_pool_config_df():
 
@@ -809,6 +818,7 @@ def clean_up_bad_data_protocols(df):
     return df
 
 @app.route('/api/update_data', methods=['GET'])
+@limiter.limit("100 per hour")  # Adjust this limit as needed
 def run_all():
     protocol_df = get_protocol_pool_config_df()
     protocol_slug_list = protocol_df['protocol_slug'].tolist()
@@ -946,6 +956,7 @@ def cached_read_zip_csv_from_cloud_storage(filename, bucket_name):
 
 # does as the name implies
 @app.route('/api/pool_tvl_incentives_and_change_in_weth_price', methods=['GET'])
+@limiter.limit("100 per hour")  # Adjust this limit as needed
 def get_pool_tvl_incentives_and_change_in_weth_price():
     # df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
     df = cached_read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
@@ -971,6 +982,7 @@ def get_pool_tvl_incentives_and_change_in_weth_price():
 
 # # returns our cloud aggregate data
 @app.route('/api/aggregate_data', methods=['GET'])
+@limiter.limit("100 per hour")  # Adjust this limit as needed
 def get_aggregate_summary_data():
 
     df = cached_read_zip_csv_from_cloud_storage(CLOUD_AGGREGATE_FILENAME, CLOUD_BUCKET_NAME)
