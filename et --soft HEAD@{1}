@@ -1,0 +1,40 @@
+[33mdd032f2[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m)[m HEAD@{0}: commit: Latest
+[33m4921224[m HEAD@{1}: commit: Added my Twitter Profile as a button
+[33mb668650[m HEAD@{2}: commit: Added a link to my Twitter account
+[33md906755[m HEAD@{3}: reset: moving to HEAD~
+[33m1cb66c0[m HEAD@{4}: commit (amend): Added a link to my Twitter account
+[33m0cae81c[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{5}: commit: Now makes commas for percentages over 1k
+[33md906755[m HEAD@{6}: commit: increased chart sizes
+[33mc15286c[m HEAD@{7}: commit: AggregateData chart is now the default chart in the selector
+[33m881c11a[m HEAD@{8}: commit: Centered Selector
+[33m06fe2e8[m HEAD@{9}: commit: Clean AggregateChart
+[33me2597b0[m HEAD@{10}: commit: latest and greatest app.tsx
+[33ma3ec143[m HEAD@{11}: commit: changed how starting_usd is calculated
+[33mda34e97[m HEAD@{12}: commit: left y-axis now better handles negative numbers
+[33m3d8bdf4[m HEAD@{13}: commit: added a function to fix some weirdly name market segments
+[33ma3e2e0c[m HEAD@{14}: commit: removed velodrome-v3 pool
+[33m3d70664[m HEAD@{15}: commit: small updates
+[33mf211364[m HEAD@{16}: commit: some .csv config file cleanup to get rid of bad data
+[33m6b381d2[m HEAD@{17}: commit: v1 of making aggregate_data
+[33m1bd4894[m HEAD@{18}: commit: added some edge case handling to main.py
+[33m245ea1b[m HEAD@{19}: commit: latest and greatest config files
+[33mc78580f[m HEAD@{20}: commit: added 1st curve pool
+[33m1f5bbbc[m HEAD@{21}: commit: added velodrome and dex config
+[33mf0caed9[m HEAD@{22}: commit: added tvl change % to right axis
+[33m5c0dcef[m HEAD@{23}: commit: Changed how each chart's title looks
+[33m83229da[m HEAD@{24}: commit: updated graph colors
+[33m2c59531[m HEAD@{25}: commit: Now allows for legend items to be clicked and re-clicked to populate the chart
+[33mf2ca44a[m HEAD@{26}: commit: Tooltip and axis styling
+[33m1db2ef4[m HEAD@{27}: commit: charts are now 3 per row instead of a drop down. Now fills up entire page as well instead of a limited sub-section
+[33mc487e5e[m HEAD@{28}: commit: added front end + fixed a few bugs
+[33mc20cac8[m HEAD@{29}: commit: fixed logic to only calculate incentives_usd off of OP tokens and not WETH
+[33m135bd95[m HEAD@{30}: commit: run_all now returns a valid json response
+[33m4bda942[m HEAD@{31}: commit: now has endpoint to update cloud data when called
+[33m1079095[m HEAD@{32}: commit: restructed project + updated requirements.txt and added app.yaml
+[33mb9e2421[m HEAD@{33}: reset: moving to HEAD~
+[33m1db2b5e[m HEAD@{34}: reset: moving to HEAD~
+[33mf02578b[m HEAD@{35}: commit: added gitignore
+[33m1db2b5e[m HEAD@{36}: commit: restructed project + updated requirements.txt and added app.yaml
+[33mb9e2421[m HEAD@{37}: reset: moving to HEAD~
+[33mb1189a2[m HEAD@{38}: commit: restructed project + updated requirements.txt and added app.yaml
+[33mb9e2421[m HEAD@{39}: clone: from https://github.com/Deantoshi/superfest.git
