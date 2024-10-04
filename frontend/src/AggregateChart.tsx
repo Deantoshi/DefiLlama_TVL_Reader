@@ -265,5 +265,5 @@ const AggregateChart: React.FC<ChartProps> = ({ data }) => {
     </div>
   );
 };
-
+// 
 export default AggregateChart;
