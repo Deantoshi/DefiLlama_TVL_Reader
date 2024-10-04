@@ -40,8 +40,8 @@ Mode,Ionic,Lending,Ionic,EZETH,supply,ionic-protocol
 Mode,Ionic,Lending,Ionic,WETH,supply,ionic-protocol
 Fraxtal,Fraxlend,Lending,Fraxlend,SFRXETH,supply,fraxlend
 Base,Fluid,Lending,Fluid,USDC,supply,fluid
-Base,ExtraFi,Lending,ExtraFi,WSTETH,AMM,extra-finance
-Base,ExtraFi,Lending,ExtraFi,WETH,AMM,extra-finance
+Base,ExtraFi,Lending,ExtraFi,WSTETH,supply,extra-finance
+Base,ExtraFi,Lending,ExtraFi,WETH,supply,extra-finance
 Fraxtal,Curve,AMM,Curve,FRAX-WFRXETH-FXS,AMM,curve-dex
 Fraxtal,Curve,AMM,Curve,CRVUSD-WFRXETH-CRV,AMM,curve-dex
 Fraxtal,Curve,AMM,Curve,CRVUSD-FRAX,AMM,curve-dex

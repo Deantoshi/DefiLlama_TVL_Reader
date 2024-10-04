@@ -9,7 +9,7 @@ interface ChartData {
   percentage_change_in_usd: number;
   weth_change_in_price_percentage: number;
   tvl_to_incentive_roi_percentage: number;
-}
+};
 
 interface ChartProps {
   data: {
@@ -86,24 +86,25 @@ interface CustomLegendProps {
     );
   };
 
-const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, title }) => {
-  const [visibleLines, setVisibleLines] = useState<VisibleLines>({
-    token_usd_amount: true,
-    raw_change_in_usd: true,
-    cumulative_incentives_usd: true,
-    percentage_change_in_usd: true,
-    weth_change_in_price_percentage: true,
-    tvl_to_incentive_roi_percentage: true
-  });
+  const SingleChart: React.FC<{ data: ChartData[] | ChartData; title: string }> = ({ data, title }) => {
+    const [visibleLines, setVisibleLines] = useState<VisibleLines>({
+      token_usd_amount: true,
+      raw_change_in_usd: true,
+      cumulative_incentives_usd: true,
+      percentage_change_in_usd: true,
+      weth_change_in_price_percentage: true,
+      tvl_to_incentive_roi_percentage: true
+    });
 
-  const processedData = useMemo(() => {
-    return data.filter(item => !isNaN(new Date(item.date).getTime())).map(item => ({
-      ...item,
-      percentage_change_in_usd: item.percentage_change_in_usd * 100,
-      weth_change_in_price_percentage: item.weth_change_in_price_percentage * 100,
-      tvl_to_incentive_roi_percentage: item.tvl_to_incentive_roi_percentage * 100
-    }));
-  }, [data]);
+    const processedData = useMemo(() => {
+        const dataArray = Array.isArray(data) ? data : [data];
+        return dataArray.filter(item => !isNaN(new Date(item.date).getTime())).map(item => ({
+          ...item,
+          percentage_change_in_usd: item.percentage_change_in_usd * 100,
+          weth_change_in_price_percentage: item.weth_change_in_price_percentage * 100,
+          tvl_to_incentive_roi_percentage: item.tvl_to_incentive_roi_percentage * 100
+        }));
+      }, [data]);
 
   const calculateYAxisDomain = useCallback((data: ChartData[], key: keyof VisibleLines) => {
     if (!visibleLines[key]) return [0, 1];
@@ -247,7 +248,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
   );
 };
 
-const AggregateChartComponent: React.FC<ChartProps> = ({ data }) => {
+const AggregateChart: React.FC<ChartProps> = ({ data }) => {
   return (
     <div className="chart-grid">
       {Object.entries(data).map(([key, chartData]) => (
@@ -257,4 +258,4 @@ const AggregateChartComponent: React.FC<ChartProps> = ({ data }) => {
   );
 };
 
-export default AggregateChartComponent;
+export default AggregateChart;

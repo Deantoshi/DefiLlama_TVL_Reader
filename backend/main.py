@@ -250,12 +250,15 @@ def get_pool_type_df(data, protocol_blockchain, pool_type):
     # # if it is a supply pool, then we make sure to add borrows to it to get a better total market size
     if pool_type == 'supply':
         category = 'tokensInUsd'
-        df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+        
+        try:
+            df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+        except:
+            df = get_historic_dex_tvl_df(data)
         try:
             pool_type = 'borrow'
             protocol_blockchain += '-borrowed'
             borrow_df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
-            print(borrow_df)
 
             df = add_dataframes(df, borrow_df)
         except:
@@ -266,8 +269,14 @@ def get_pool_type_df(data, protocol_blockchain, pool_type):
         category = 'tokensInUsd'
         protocol_blockchain += '-borrowed'
         df = get_historic_protocol_tvl_df(data, protocol_blockchain, category)
+    
 
-    elif pool_type == 'AMM':
+    elif pool_type == 'AMM' or pool_type == 'Yield_Vault' or pool_type == 'Lending':
+        if pool_type == 'Yield_Vault':
+            print('Yield')
+            print(type(data))
+            print(data)
+    
         category = 'tokensInUsd'
         df = get_historic_dex_tvl_df(data)
 
@@ -761,8 +770,6 @@ def get_aggregate_top_level_df(df):
     df[['token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'op_price', 'incentives_per_day_usd', 'weth_price', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage']] = df[['token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'daily_tvl', 'epoch_token_incentives', 'incentives_per_day', 'op_price', 'incentives_per_day_usd', 'weth_price', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage']].astype(float)
     df['date'] = pd.to_datetime(df['date'])
 
-    print(df.dtypes)
-
     # Group by day and aggregate the specified columns
     aggregated_df = df.groupby(df['date']).agg({
         'token_usd_amount': 'sum',
@@ -827,8 +834,6 @@ def run_all():
         token = token_list[i]
         chain = chain_list[i]
         
-        if chain == 'Mode':
-            print('Here')
         # # we will only send another api ping if we are using a new slug
         if last_slug != protocol_slug:
             if pool_type == 'AMM':
@@ -904,9 +909,14 @@ def run_all():
 
     merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
 
+
+    print(len(merged_df))
+    merged_df = merged_df.drop_duplicates(subset=['date', 'chain', 'token', 'pool_type', 'protocol'])
+    print(len(merged_df))
+
     merged_df = clean_up_bad_data_protocols(merged_df)
 
-    merged_df = fix_protocol_segments(merged_df)
+    # merged_df = fix_protocol_segments(merged_df)
 
     aggregate_df = get_aggregate_top_level_df(merged_df)
 
@@ -959,6 +969,17 @@ def get_pool_tvl_incentives_and_change_in_weth_price():
     
     return jsonify(result)
 
+# # returns our cloud aggregate data
+@app.route('/api/aggregate_data', methods=['GET'])
+def get_aggregate_summary_data():
+
+    df = cached_read_zip_csv_from_cloud_storage(CLOUD_AGGREGATE_FILENAME, CLOUD_BUCKET_NAME)
+
+    data = df.to_dict(orient='records')
+
+    return jsonify(data)
+
+
 # # does as the name implies
 def get_dex_pool_config():
     df = pd.read_csv('dex_pool_config.csv')
@@ -979,7 +1000,7 @@ def fix_protocol_segments(df):
 
     return df
 
-# # takes a slug and gives bakc a pool_id
+# # takes a slug and gives back a pool_id
 def get_dex_pool_pool_id(protocol_slug):
 
     dex_config_df = get_dex_pool_config()
@@ -1004,6 +1025,6 @@ if __name__ == '__main__':
 
 # df = cs.read_zip_csv_from_cloud_storage(CLOUD_AGGREGATE_FILENAME, CLOUD_BUCKET_NAME)
 # df = get_aggregate_top_level_df(df)
-# # df = df.loc[df['protocol'] == 'aave-v3']
+# df = df.loc[df['protocol'] == 'aave-v3']
 # print(df)
 # df.to_csv('test_test.csv', index=False)

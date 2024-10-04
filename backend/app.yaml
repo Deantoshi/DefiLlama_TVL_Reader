@@ -5,7 +5,7 @@ service: superfest-api
 runtime: python311
 
 runtime_config:
-  request_timeout: 180
+  request_timeout: 300
 
 instance_class: B2
 

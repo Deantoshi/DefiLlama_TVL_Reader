@@ -2,13 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import cod3xLogo from './assets/cod3x.jpg';
 import './App.css';
 import axios from 'axios';
-import ComposedChartComponent from './ComboChart1.tsx';
+import ComposedChartComponent from './ComboChart1';
 import LoadingAnimation from './LoadingAnimation';
-import AggregateChartComponent from './AggregateChart.tsx';
+import AggregateChart from './AggregateChart';
 
 const api_url = 'http://localhost:8000';
 
-interface ChartData {
+interface ComposedChartData {
   [key: string]: {
     date: string;
     token_usd_amount: number;
@@ -19,17 +19,42 @@ interface ChartData {
   }[];
 }
 
+interface ChartData {
+  date: string;
+  token_usd_amount: number;
+  raw_change_in_usd: number;
+  cumulative_incentives_usd: number;
+  percentage_change_in_usd: number;
+  weth_change_in_price_percentage: number;
+  tvl_to_incentive_roi_percentage: number;
+}
+
+interface AggregateChartData {
+  [key: string]: ChartData[];
+}
+
 function App() {
-  const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [composedChartData, setComposedChartData] = useState<ComposedChartData | null>(null);
+  const [aggregateChartData, setAggregateChartData] = useState<AggregateChartData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedProtocol, setSelectedProtocol] = useState<string>('Aave-v3');
+  const [selectedView, setSelectedView] = useState<string>('Aggregate');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(`${api_url}/api/pool_tvl_incentives_and_change_in_weth_price`);
-        setChartData(response.data);
+        const [poolResponse, aggregateResponse] = await Promise.all([
+          axios.get<ComposedChartData>(`${api_url}/api/pool_tvl_incentives_and_change_in_weth_price`),
+          axios.get<AggregateChartData>(`${api_url}/api/aggregate_data`)
+        ]);
+        setComposedChartData(poolResponse.data);
+        
+        // Combine all aggregate data into a single array under a new key
+        const combinedAggregateData = Object.values(aggregateResponse.data).flat();
+        setAggregateChartData({
+          "All Aggregated Data": combinedAggregateData
+        });
+        
         setIsLoading(false);
       } catch (err) {
         console.error('Error fetching chart data:', err);
@@ -42,17 +67,18 @@ function App() {
   }, []);
 
   const protocols = useMemo(() => {
-    if (!chartData) return ['Aave-v3'];
-    const protocolSet = new Set(['Aave-v3', ...Object.keys(chartData).map(key => key.split(' ')[0])]);
+    if (!composedChartData) return ['Aggregate'];
+    const protocolSet = new Set(['Aggregate', ...Object.keys(composedChartData).map(key => key.split(' ')[0])]);
     return Array.from(protocolSet);
-  }, [chartData]);
+  }, [composedChartData]);
 
-  const filteredChartData = useMemo(() => {
-    if (!chartData) return null;
+  const filteredComposedChartData = useMemo(() => {
+    if (!composedChartData) return null;
+    if (selectedView === 'Aggregate') return null;
     return Object.fromEntries(
-      Object.entries(chartData).filter(([key]) => key.startsWith(selectedProtocol))
+      Object.entries(composedChartData).filter(([key]) => key.startsWith(selectedView))
     );
-  }, [chartData, selectedProtocol]);
+  }, [composedChartData, selectedView]);
 
   return (
     <div className="App">
@@ -62,11 +88,11 @@ function App() {
       <main className="main-content">
         <div className="protocol-selector-container">
           <div className="protocol-selector">
-            <label htmlFor="protocol-select">Select an App: </label>
+            <label htmlFor="protocol-select">Select View: </label>
             <select 
               id="protocol-select"
-              value={selectedProtocol}
-              onChange={(e) => setSelectedProtocol(e.target.value)}
+              value={selectedView}
+              onChange={(e) => setSelectedView(e.target.value)}
             >
               {protocols.map(protocol => (
                 <option key={protocol} value={protocol}>{protocol}</option>
@@ -79,8 +105,10 @@ function App() {
             <LoadingAnimation />
           ) : error ? (
             <div className="error-message">{error}</div>
-          ) : filteredChartData ? (
-            <ComposedChartComponent data={filteredChartData} />
+          ) : selectedView === 'Aggregate' && aggregateChartData ? (
+            <AggregateChart data={aggregateChartData} />
+          ) : filteredComposedChartData ? (
+            <ComposedChartComponent data={filteredComposedChartData} />
           ) : (
             <div>No data available</div>
           )}

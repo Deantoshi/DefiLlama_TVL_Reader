@@ -1,6 +1,6 @@
 chain,platform,segment,partner,token,pool_type,protocol_slug,pool_id
 Optimism,Velodrome,AMM,Bedrock,UNIBTC-WBTC,AMM,velodrome-v2,8eb2a7c9-419c-4fcf-9f75-d44dac8674c6
-Base,Toros,Other,Toros,SUSDCY,AMM,toros,3e137f9a-97bc-4d3a-81d4-b342125fc262
+Base,Toros,Yield_Vault,Toros,SUSDCY,AMM,toros,3e137f9a-97bc-4d3a-81d4-b342125fc262
 Base,Morpho,Lending,Morpho,WSTETH-WETH,AMM,morpho-blue,046c6e4e-4c0c-4b42-9c9c-43364e470c03
 Base,Morpho,Lending,Etherfi,WEETH-WETH,AMM,morpho-blue,4cbae2d6-3e46-496c-9d4a-274d201ec50f
 Base,Morpho,Lending,Renzo,EZETH-WETH,AMM,morpho-blue,020a0e72-ddfc-4b9b-af6f-441f360136c8
@@ -8,8 +8,8 @@ Base,Morpho,Lending,Etherfi,WEETH-USDC,AMM,morpho-blue,b95d592b-c94e-4d6d-8560-5
 Base,Morpho,Lending,Morpho,EZETH-USDC,AMM,morpho-blue,9bbe1e92-4272-438f-81c4-f8b84e0f8d52
 Base,Morpho,Lending,Morpho,CBETH-USDC,AMM,morpho-blue,61faa6f7-db51-4205-b090-7d8bfacbad72
 Base,Morpho,Lending,Morpho,WUSD+-USDC,AMM,morpho-blue,c00514d6-a010-4d8c-a83a-0d4a73978740
-Base,ExtraFi,Lending,ExtraFi,WSTETH,AMM,extra-finance,dc26aaf7-3bfc-47b3-8041-2a40f9e8e256
-Base,ExtraFi,Lending,ExtraFi,WETH,AMM,extra-finance,a9865520-5058-42ac-9a8b-99e021f2831a
+Base,ExtraFi,Lending,ExtraFi,WSTETH,supply,extra-finance,dc26aaf7-3bfc-47b3-8041-2a40f9e8e256
+Base,ExtraFi,Lending,ExtraFi,WETH,supply,extra-finance,a9865520-5058-42ac-9a8b-99e021f2831a
 Fraxtal,Curve,AMM,Curve,FRAX-WFRXETH-FXS,AMM,curve-dex,f071ba3c-20a5-4e7a-b058-963aca464e10
 Fraxtal,Curve,AMM,Curve,CRVUSD-WFRXETH-CRV,AMM,curve-dex,394e78dd-2207-40ea-b5ee-4e459229baef
 Fraxtal,Curve,AMM,Renzo,CRVUSD-FRAX,AMM,curve-dex,c1acf34c-8528-4a41-b201-dec870926b31
