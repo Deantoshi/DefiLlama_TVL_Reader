@@ -4,6 +4,7 @@ import './App.css';
 import axios from 'axios';
 import ComposedChartComponent from './ComboChart1.tsx';
 import LoadingAnimation from './LoadingAnimation';
+import AggregateChartComponent from './AggregateChart.tsx';
 
 const api_url = 'http://localhost:8000';
 
@@ -70,6 +71,9 @@ function App() {
               <option key={protocol} value={protocol}>{protocol}</option>
             ))}
           </select>
+        </div>
+        <div>
+
         </div>
         <div className="chart-container">
           {isLoading ? (
