@@ -163,7 +163,7 @@ interface CustomLegendProps {
   return (
     <div className="single-chart">
       <h3>{title}</h3>
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={600}>
         <ComposedChart data={visibleData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 
