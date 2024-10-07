@@ -57,12 +57,21 @@ const formatCurrency = (value: number): string => {
 };
 
 const formatPercentage = (value: number): string => {
-    const absValue = Math.abs(value);
-    if (absValue >= 1000) {
-      return `${Number(value.toFixed(2)).toLocaleString()}%`;
-    }
-    return `${value.toFixed(2)}%`;
-  };
+  const absValue = Math.abs(value);
+  if (absValue >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M%`;
+  } else if (absValue >= 10000) {
+    return `${(value / 10000).toFixed(0)}K%`;
+  }
+  return `${value.toFixed(1)}%`;
+};
+
+const formatFullNumber = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+};
 
 interface CustomLegendProps {
     payload?: Array<{dataKey: string; value: string; color: string}>;
@@ -134,10 +143,10 @@ interface CustomLegendProps {
   const rightYAxisDomain = useMemo(() => {
     const domains = ['percentage_change_in_usd', 'weth_change_in_price_percentage', 'tvl_to_incentive_roi_percentage']
       .map(key => calculateYAxisDomain(processedData, key as keyof VisibleLines));
-    return [
-      Math.min(...domains.map(d => d[0])),
-      Math.max(...domains.map(d => d[1]))
-    ];
+    const minValue = Math.min(...domains.map(d => d[0]));
+    const maxValue = Math.max(...domains.map(d => d[1]));
+    // Extend the domain slightly to ensure all data points are visible
+    return [minValue * 1.1, maxValue * 1.1];
   }, [processedData, calculateYAxisDomain]);
 
   const handleLegendClick = useCallback((dataKey: string) => {
@@ -198,7 +207,7 @@ interface CustomLegendProps {
             yAxisId="right" 
             orientation="right" 
             domain={rightYAxisDomain}
-            tickFormatter={(value) => `${value.toFixed(0)}%`}
+            tickFormatter={(value) => formatPercentage(value)}
             label={{ 
               value: 'TVL + WETH Change (%)', 
               angle: -90, 
@@ -206,6 +215,7 @@ interface CustomLegendProps {
               offset: 5,
               dx: 28,
             }}
+            allowDataOverflow={false}
           />
           <Tooltip
             contentStyle={{
@@ -219,7 +229,7 @@ interface CustomLegendProps {
                 case "WETH Price Change Since Start":
                 case "TVL Change Since Start":
                 case "TVL to Incentive ROI":
-                  return [formatPercentage(Number(value)), name];
+                  return [`${formatFullNumber(Number(value))}%`, name];
                 case "Pool TVL":
                 case "Pool Change Since Start":
                 case "Cumulative OP Incentives":
