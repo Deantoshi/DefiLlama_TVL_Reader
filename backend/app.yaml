@@ -4,18 +4,33 @@ env_variables:
 service: superfest-api
 runtime: python311
 
-runtime_config:
-  request_timeout: 300
+instance_class: F2
 
-instance_class: B2
-
-# Specify the maximum number of instances for basic scaling
-basic_scaling:
+# Automatic scaling configuration
+automatic_scaling:
+  min_instances: 0
   max_instances: 1
-  idle_timeout: 4m
+  min_idle_instances: automatic
+  max_idle_instances: 0
+  min_pending_latency: automatic
+  max_pending_latency: automatic
+  target_cpu_utilization: 0.95
+  target_throughput_utilization: 0.95
+  max_concurrent_requests: 80
+
+# Enable App Engine APIs
+app_engine_apis: true
 
 handlers:
 - url: /.*
   script: auto
   login: optional
   secure: always
+
+# Environment variables
+env_variables:
+  GAE_DEPLOYMENT_ID: "1"
+
+# Specify the request timeout
+runtime_config:
+  request_timeout: 300
