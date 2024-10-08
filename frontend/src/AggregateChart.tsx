@@ -9,6 +9,7 @@ interface ChartData {
   percentage_change_in_usd: number;
   weth_change_in_price_percentage: number;
   tvl_to_incentive_roi_percentage: number;
+  incentives_per_day_usd: number;
 };
 
 interface ChartProps {
@@ -110,18 +111,26 @@ interface CustomLegendProps {
       cumulative_incentives_usd: true,
       percentage_change_in_usd: true,
       weth_change_in_price_percentage: true,
-      tvl_to_incentive_roi_percentage: true
+      tvl_to_incentive_roi_percentage: true,
+      incentives_per_day_usd: true
     });
 
     const processedData = useMemo(() => {
-        const dataArray = Array.isArray(data) ? data : [data];
-        return dataArray.filter(item => !isNaN(new Date(item.date).getTime())).map(item => ({
-          ...item,
-          percentage_change_in_usd: item.percentage_change_in_usd * 100,
-          weth_change_in_price_percentage: item.weth_change_in_price_percentage * 100,
-          tvl_to_incentive_roi_percentage: item.tvl_to_incentive_roi_percentage * 100
-        }));
-      }, [data]);
+      const dataArray = Array.isArray(data) ? data : [data];
+      const filteredData = dataArray
+        .filter(item => !isNaN(new Date(item.date).getTime()))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+      // Remove the last (most recent) data point
+      const dataWithoutLatest = filteredData.slice(0, -1);
+    
+      return dataWithoutLatest.map(item => ({
+        ...item,
+        percentage_change_in_usd: item.percentage_change_in_usd * 100,
+        weth_change_in_price_percentage: item.weth_change_in_price_percentage * 100,
+        tvl_to_incentive_roi_percentage: item.tvl_to_incentive_roi_percentage
+      }));
+    }, [data]);
 
   const calculateYAxisDomain = useCallback((data: ChartData[], key: keyof VisibleLines) => {
     if (!visibleLines[key]) return [0, 1];
@@ -132,7 +141,7 @@ interface CustomLegendProps {
   }, [visibleLines]);
 
   const leftYAxisDomain = useMemo(() => {
-    const domains = ['token_usd_amount', 'raw_change_in_usd', 'cumulative_incentives_usd']
+    const domains = ['token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd', 'tvl_to_incentive_roi_percentage']
       .map(key => calculateYAxisDomain(processedData, key as keyof VisibleLines));
     return [
       Math.min(...domains.map(d => d[0])),
@@ -141,7 +150,7 @@ interface CustomLegendProps {
   }, [processedData, calculateYAxisDomain]);
 
   const rightYAxisDomain = useMemo(() => {
-    const domains = ['percentage_change_in_usd', 'weth_change_in_price_percentage', 'tvl_to_incentive_roi_percentage']
+    const domains = ['percentage_change_in_usd', 'weth_change_in_price_percentage']
       .map(key => calculateYAxisDomain(processedData, key as keyof VisibleLines));
     const minValue = Math.min(...domains.map(d => d[0]));
     const maxValue = Math.max(...domains.map(d => d[1]));
@@ -159,10 +168,10 @@ interface CustomLegendProps {
   const chartElements: ChartElementType[] = [
     { dataKey: 'token_usd_amount', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e8dab2", name: "Pool TVL" } },
     { dataKey: 'raw_change_in_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#82ca9d", name: "Pool Change Since Start" } },
-    { dataKey: 'cumulative_incentives_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e24343", name: "Cumulative OP Incentives" } },
+    { dataKey: 'incentives_per_day_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e24343", name: "OP Incentives per Day" } },
+    { dataKey: 'tvl_to_incentive_roi_percentage', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#4CAF50", name: "TVL Change per USD Incentivized"} },
     { dataKey: 'percentage_change_in_usd', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#F7931A", name: "TVL Change Since Start", dot: false, strokeWidth: 3 } },
     { dataKey: 'weth_change_in_price_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#945bd6", name: "WETH Price Change Since Start", dot: false, strokeWidth: 3 } },
-    { dataKey: 'tvl_to_incentive_roi_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#4CAF50", name: "TVL to Incentive ROI", dot: false, strokeWidth: 3 } },
   ];
 
   const visibleData = useMemo(() => {
@@ -228,11 +237,11 @@ interface CustomLegendProps {
               switch (name) {
                 case "WETH Price Change Since Start":
                 case "TVL Change Since Start":
-                case "TVL to Incentive ROI":
                   return [`${formatFullNumber(Number(value))}%`, name];
                 case "Pool TVL":
                 case "Pool Change Since Start":
-                case "Cumulative OP Incentives":
+                case "OP Incentives per Day":
+                case "TVL Change per USD Incentivized":
                   return [formatCurrency(Number(value)), name];
                 default:
                   return [value, name];
