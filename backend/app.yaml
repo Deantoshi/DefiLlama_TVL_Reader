@@ -19,17 +19,13 @@ automatic_scaling:
   max_concurrent_requests: 80
 
 # Enable App Engine APIs
-app_engine_apis: true
+app_engine_apis: false
 
 handlers:
 - url: /.*
   script: auto
   login: optional
   secure: always
-
-# Environment variables
-env_variables:
-  GAE_DEPLOYMENT_ID: "1"
 
 # Specify the request timeout
 runtime_config:

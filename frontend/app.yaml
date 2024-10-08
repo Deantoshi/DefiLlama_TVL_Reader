@@ -1,7 +1,7 @@
 env_variables:
   VITE_API_URL: "https://api-dot-internal-website-427620.uc.r.appspot.com"
 
-service: superfest-frontend
+# service: superfest-frontend
 runtime: nodejs18
 entrypoint: node server.js
 
