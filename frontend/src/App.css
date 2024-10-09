@@ -229,4 +229,13 @@
 .x-button svg {
   margin-right: 8px;
 }
+
+.weth-adjustment {
+  margin-left: 20px;
+  display: inline-block;
+}
+
+.weth-adjustment input {
+  margin-right: 5px;
+}
 /*  */

@@ -1012,7 +1012,8 @@ def get_pool_tvl_incentives_and_change_in_weth_price():
     incentive_combo_list = get_incentive_combo_list()
     df = df[df['combo_name'].isin(incentive_combo_list)]
     
-    columns_to_keep = ['date', 'chain', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage', 'tvl_to_incentive_roi_percentage']
+    columns_to_keep = ['date', 'chain', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage', 'tvl_to_incentive_roi_percentage',
+    'adjusted_token_usd_amount', 'adjusted_raw_change_in_usd', 'adjusted_incentives_per_day_usd', 'adjusted_weth_change_in_price_percentage', 'adjusted_percentage_change_in_usd', 'adjusted_tvl_to_incentive_roi_percentage']
     df = df[columns_to_keep]
     
     # Convert 'date' column to datetime, sort, and format to ISO 8601

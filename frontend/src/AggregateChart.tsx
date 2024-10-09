@@ -10,12 +10,20 @@ interface ChartData {
   weth_change_in_price_percentage: number;
   tvl_to_incentive_roi_percentage: number;
   incentives_per_day_usd: number;
+  
+  adjusted_token_usd_amount: number;
+  adjusted_raw_change_in_usd: number;
+  adjusted_incentives_per_day_usd: number;
+  adjusted_weth_change_in_price_percentage: number;
+  adjusted_percentage_change_in_usd: number;
+  adjusted_tvl_to_incentive_roi_percentage: number;
 };
 
 interface ChartProps {
   data: {
     [key: string]: ChartData[];
   };
+  isWethAdjusted: boolean;
 }
 
 type VisibleLines = {
@@ -104,7 +112,7 @@ interface CustomLegendProps {
     );
   };
 
-  const SingleChart: React.FC<{ data: ChartData[] | ChartData; title: string }> = ({ data, title }) => {
+  const SingleChart: React.FC<{ data: ChartData[] | ChartData; title: string; isWethAdjusted: boolean }> = ({ data, title, isWethAdjusted }) => {
     const [visibleLines, setVisibleLines] = useState<VisibleLines>({
       token_usd_amount: true,
       raw_change_in_usd: true,
@@ -112,7 +120,13 @@ interface CustomLegendProps {
       percentage_change_in_usd: true,
       weth_change_in_price_percentage: true,
       tvl_to_incentive_roi_percentage: true,
-      incentives_per_day_usd: true
+      incentives_per_day_usd: true,
+      adjusted_token_usd_amount: true,
+      adjusted_raw_change_in_usd: true,
+      adjusted_incentives_per_day_usd: true,
+      adjusted_weth_change_in_price_percentage: true,
+      adjusted_percentage_change_in_usd: true,
+      adjusted_tvl_to_incentive_roi_percentage: true,
     });
 
     const processedData = useMemo(() => {
@@ -121,14 +135,15 @@ interface CustomLegendProps {
         .filter(item => !isNaN(new Date(item.date).getTime()))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
-      // Remove the last (most recent) data point
       const dataWithoutLatest = filteredData.slice(0, -1);
     
       return dataWithoutLatest.map(item => ({
         ...item,
         percentage_change_in_usd: item.percentage_change_in_usd * 100,
         weth_change_in_price_percentage: item.weth_change_in_price_percentage * 100,
-        tvl_to_incentive_roi_percentage: item.tvl_to_incentive_roi_percentage
+        tvl_to_incentive_roi_percentage: item.tvl_to_incentive_roi_percentage,
+        adjusted_percentage_change_in_usd: item.adjusted_percentage_change_in_usd * 100,
+        adjusted_tvl_to_incentive_roi_percentage: item.adjusted_tvl_to_incentive_roi_percentage,
       }));
     }, [data]);
 
@@ -165,14 +180,38 @@ interface CustomLegendProps {
     }));
   }, []);
 
-  const chartElements: ChartElementType[] = [
-    { dataKey: 'token_usd_amount', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e8dab2", name: "Pool TVL" } },
-    { dataKey: 'raw_change_in_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#82ca9d", name: "Pool Change Since Start" } },
-    { dataKey: 'incentives_per_day_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e24343", name: "OP Incentives per Day" } },
-    { dataKey: 'tvl_to_incentive_roi_percentage', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#4CAF50", name: "TVL Change per USD Incentivized"} },
-    { dataKey: 'percentage_change_in_usd', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#F7931A", name: "TVL Change Since Start", dot: false, strokeWidth: 3 } },
-    { dataKey: 'weth_change_in_price_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#945bd6", name: "WETH Price Change Since Start", dot: false, strokeWidth: 3 } },
-  ];
+  const chartElements: ChartElementType[] = useMemo(() => [
+    { 
+      dataKey: isWethAdjusted ? 'adjusted_token_usd_amount' : 'token_usd_amount', 
+      Component: Bar, 
+      props: { yAxisId: "left", stackId: "a", fill: "#e8dab2", name: "Pool TVL" } 
+    },
+    { 
+      dataKey: isWethAdjusted ? 'adjusted_raw_change_in_usd' : 'raw_change_in_usd', 
+      Component: Bar, 
+      props: { yAxisId: "left", stackId: "a", fill: "#82ca9d", name: "Pool Change Since Start" } 
+    },
+    { 
+      dataKey: 'incentives_per_day_usd', 
+      Component: Bar, 
+      props: { yAxisId: "left", stackId: "a", fill: "#e24343", name: "OP Incentives per Day" } 
+    },
+    { 
+      dataKey: isWethAdjusted ? 'adjusted_tvl_to_incentive_roi_percentage' : 'tvl_to_incentive_roi_percentage', 
+      Component: Bar, 
+      props: { yAxisId: "left", stackId: "a", fill: "#4CAF50", name: "TVL Change per USD Incentivized"} 
+    },
+    { 
+      dataKey: isWethAdjusted ? 'adjusted_percentage_change_in_usd' : 'percentage_change_in_usd', 
+      Component: Line, 
+      props: { yAxisId: "right", type: "monotone", stroke: "#F7931A", name: "TVL Change Since Start", dot: false, strokeWidth: 3 } 
+    },
+    { 
+      dataKey: 'weth_change_in_price_percentage', 
+      Component: Line, 
+      props: { yAxisId: "right", type: "monotone", stroke: "#945bd6", name: "WETH Price Change Since Start", dot: false, strokeWidth: 3 } 
+    },
+  ], [isWethAdjusted]);
 
   const visibleData = useMemo(() => {
     return processedData.map(entry => {
@@ -188,7 +227,7 @@ interface CustomLegendProps {
 
   return (
     <div className="single-chart">
-      <h3>{title}</h3>
+      <h3>{title} {isWethAdjusted ? '(WETH Price Adjusted)' : ''}</h3>
       <ResponsiveContainer width="100%" height={600}>
         <ComposedChart data={visibleData}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -275,11 +314,11 @@ interface CustomLegendProps {
   );
 };
 
-const AggregateChart: React.FC<ChartProps> = ({ data }) => {
+const AggregateChart: React.FC<ChartProps> = ({ data, isWethAdjusted }) => {
   return (
     <div className="chart-grid">
       {Object.entries(data).map(([key, chartData]) => (
-        <SingleChart key={key} data={chartData} title={key} />
+        <SingleChart key={key} data={chartData} title={key} isWethAdjusted={isWethAdjusted} />
       ))}
     </div>
   );

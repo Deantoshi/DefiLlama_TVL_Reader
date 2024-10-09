@@ -9,13 +9,21 @@ interface ChartData {
   weth_change_in_price_percentage: number;
   percentage_change_in_usd: number;
   tvl_to_incentive_roi_percentage: number;
+  adjusted_token_usd_amount: number;
+  adjusted_raw_change_in_usd: number;
+  adjusted_incentives_per_day_usd: number;
+  adjusted_percentage_change_in_usd: number;
+  adjusted_tvl_to_incentive_roi_percentage: number;
 }
 
 interface ChartProps {
   data: {
     [key: string]: ChartData[];
   };
+  isWethAdjusted: boolean;
 }
+
+type VisibleLineKeys = Exclude<keyof ChartData, 'date'>;
 
 type VisibleLines = {
   [K in VisibleLineKeys]: boolean;
@@ -26,8 +34,6 @@ type ChartElementType = {
   Component: typeof Bar | typeof Line;
   props: React.ComponentProps<typeof Bar> | React.ComponentProps<typeof Line>;
 };
-
-type VisibleLineKeys = Exclude<keyof ChartData, 'date'>;
 
 const formatXAxis = (tickItem: string) => {
   const date = new Date(tickItem);
@@ -56,6 +62,20 @@ const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
+const formatPercentage = (value: number): string => {
+  const absValue = Math.abs(value);
+  if (absValue >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M%`;
+  } else if (absValue >= 1000) {
+    return `${(value / 1000).toFixed(1)}k%`;
+  }
+  return `${value.toFixed(2)}%`;
+};
+
+const formatTooltipPercentage = (value: number): string => {
+  return value.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+};
+
 const CustomLegend: React.FC<{
   payload: any[];
   onClick: (dataKey: string) => void;
@@ -82,14 +102,19 @@ const CustomLegend: React.FC<{
   );
 };
 
-const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, title }) => {
+const SingleChart: React.FC<{ data: ChartData[]; title: string; isWethAdjusted: boolean }> = ({ data, title, isWethAdjusted }) => {
   const [visibleLines, setVisibleLines] = useState<VisibleLines>({
     token_usd_amount: true,
     raw_change_in_usd: true,
     incentives_per_day_usd: true,
     weth_change_in_price_percentage: true,
     percentage_change_in_usd: true,
-    tvl_to_incentive_roi_percentage: true
+    tvl_to_incentive_roi_percentage: true,
+    adjusted_token_usd_amount: true,
+    adjusted_raw_change_in_usd: true,
+    adjusted_incentives_per_day_usd: true,
+    adjusted_percentage_change_in_usd: true,
+    adjusted_tvl_to_incentive_roi_percentage: true
   });
 
   const processedData = useMemo(() => {
@@ -97,12 +122,13 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
     return validData.map((item, index) => ({
       ...item,
       weth_change_in_price_percentage: index === 0 ? 0 : item.weth_change_in_price_percentage * 100,
-      percentage_change_in_usd: index === 0 ? 0 : item.percentage_change_in_usd * 100
+      percentage_change_in_usd: index === 0 ? 0 : item.percentage_change_in_usd * 100,
+      adjusted_percentage_change_in_usd: index === 0 ? 0 : item.adjusted_percentage_change_in_usd * 100
     }));
   }, [data]);
 
   const calculateYAxisDomain = useCallback((data: ChartData[], key: keyof VisibleLines) => {
-    if (!visibleLines[key]) return [0, 1]; // Default domain if series is inactive
+    if (!visibleLines[key]) return [0, 1];
     const values = data.map(item => item[key] as number);
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
@@ -110,22 +136,25 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
   }, [visibleLines]);
 
   const leftYAxisDomain = useMemo(() => {
-    const domains = ['token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd', 'tvl_to_incentive_roi_percentage']
-      .map(key => calculateYAxisDomain(processedData, key as keyof VisibleLines));
+    const keys = isWethAdjusted
+      ? ['adjusted_token_usd_amount', 'adjusted_raw_change_in_usd', 'adjusted_incentives_per_day_usd', 'adjusted_tvl_to_incentive_roi_percentage']
+      : ['token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd', 'tvl_to_incentive_roi_percentage'];
+    const domains = keys.map(key => calculateYAxisDomain(processedData, key as keyof VisibleLines));
     return [
       Math.min(...domains.map(d => d[0])),
       Math.max(...domains.map(d => d[1]))
     ];
-  }, [processedData, calculateYAxisDomain]);
+  }, [processedData, calculateYAxisDomain, isWethAdjusted]);
 
   const rightYAxisDomain = useMemo(() => {
     const wethDomain = calculateYAxisDomain(processedData, 'weth_change_in_price_percentage');
-    const percentageDomain = calculateYAxisDomain(processedData, 'percentage_change_in_usd');
+    const percentageKey = isWethAdjusted ? 'adjusted_percentage_change_in_usd' : 'percentage_change_in_usd';
+    const percentageDomain = calculateYAxisDomain(processedData, percentageKey);
     return [
       Math.min(wethDomain[0], percentageDomain[0]),
       Math.max(wethDomain[1], percentageDomain[1])
     ];
-  }, [processedData, calculateYAxisDomain]);
+  }, [processedData, calculateYAxisDomain, isWethAdjusted]);
 
   const handleLegendClick = useCallback((dataKey: string) => {
     setVisibleLines(prev => ({
@@ -135,12 +164,12 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
   }, []);
 
   const chartElements: ChartElementType[] = [
-    { dataKey: 'token_usd_amount', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e8dab2", name: "Pool TVL" } },
-    { dataKey: 'raw_change_in_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#82ca9d", name: "Pool Change Since Start" } },
-    { dataKey: 'incentives_per_day_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e24343", name: "OP Incentives per Day" } },
-    { dataKey: 'tvl_to_incentive_roi_percentage', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#4CAF50", name: "TVL Change per USD Incentivized"} },
+    { dataKey: isWethAdjusted ? 'adjusted_token_usd_amount' : 'token_usd_amount', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e8dab2", name: "Pool TVL" } },
+    { dataKey: isWethAdjusted ? 'adjusted_raw_change_in_usd' : 'raw_change_in_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#82ca9d", name: "Pool Change Since Start" } },
+    { dataKey: isWethAdjusted ? 'adjusted_incentives_per_day_usd' : 'incentives_per_day_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e24343", name: "OP Incentives per Day" } },
+    { dataKey: isWethAdjusted ? 'adjusted_tvl_to_incentive_roi_percentage' : 'tvl_to_incentive_roi_percentage', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#4CAF50", name: "TVL Change per USD Incentivized"} },
     { dataKey: 'weth_change_in_price_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#945bd6", name: "WETH Price Change Since Start", dot: false, strokeWidth: 3 } },
-    { dataKey: 'percentage_change_in_usd', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#F7931A", name: "TVL Change Since Start", dot: false, strokeWidth: 3 } },
+    { dataKey: isWethAdjusted ? 'adjusted_percentage_change_in_usd' : 'percentage_change_in_usd', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#F7931A", name: "TVL Change Since Start", dot: false, strokeWidth: 3 } },
   ];
 
   const visibleData = useMemo(() => {
@@ -157,7 +186,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
 
   return (
     <div className="single-chart">
-      <h3>{title}</h3>
+      <h3>{title} {isWethAdjusted ? '(WETH Price Adjusted)' : ''}</h3>
       <ResponsiveContainer width="100%" height={600}>
         <ComposedChart data={visibleData}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -185,7 +214,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
             yAxisId="right" 
             orientation="right" 
             domain={rightYAxisDomain}
-            tickFormatter={(value) => `${value.toFixed(0)}%`}
+            tickFormatter={formatPercentage}
             label={{ 
               value: 'TVL + WETH Change (%)', 
               angle: -90, 
@@ -205,7 +234,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
               switch (name) {
                 case "WETH Price Change Since Start":
                 case "TVL Change Since Start":
-                  return [`${Number(value).toFixed(2)}%`, name];
+                  return [formatPercentage(Number(value)), name];
                 case "Pool TVL":
                 case "Pool Change Since Start":
                 case "OP Incentives per Day":
@@ -243,11 +272,11 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
   );
 };
 
-const ComposedChartComponent: React.FC<ChartProps> = ({ data }) => {
+const ComposedChartComponent: React.FC<ChartProps> = ({ data, isWethAdjusted }) => {
   return (
     <div className="chart-grid">
       {Object.entries(data).map(([key, chartData]) => (
-        <SingleChart key={key} data={chartData} title={key} />
+        <SingleChart key={key} data={chartData} title={key} isWethAdjusted={isWethAdjusted} />
       ))}
     </div>
   );

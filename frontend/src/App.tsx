@@ -6,7 +6,7 @@ import ComposedChartComponent from './ComboChart1';
 import LoadingAnimation from './LoadingAnimation';
 import AggregateChart from './AggregateChart';
 
-const api_url = 'https://superfest-api-dot-internal-website-427620.uc.r.appspot.com';
+const api_url = 'http://localhost:8000';
 
 // Custom X logo component
 const XLogo = ({ size = 24, color = 'currentColor' }) => (
@@ -24,6 +24,13 @@ interface ComposedChartData {
     weth_change_in_price_percentage: number;
     percentage_change_in_usd: number;
     tvl_to_incentive_roi_percentage: number;
+
+    adjusted_token_usd_amount: number;
+    adjusted_raw_change_in_usd: number;
+    adjusted_incentives_per_day_usd: number;
+    adjusted_weth_change_in_price_percentage: number;
+    adjusted_percentage_change_in_usd: number;
+    adjusted_tvl_to_incentive_roi_percentage: number;
   }[];
 }
 
@@ -36,6 +43,13 @@ interface ChartData {
   weth_change_in_price_percentage: number;
   tvl_to_incentive_roi_percentage: number;
   incentives_per_day_usd: number;
+  
+  adjusted_token_usd_amount: number;
+  adjusted_raw_change_in_usd: number;
+  adjusted_incentives_per_day_usd: number;
+  adjusted_weth_change_in_price_percentage: number;
+  adjusted_percentage_change_in_usd: number;
+  adjusted_tvl_to_incentive_roi_percentage: number;
 }
 
 interface AggregateChartData {
@@ -48,6 +62,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedView, setSelectedView] = useState<string>('Aggregate');
+  const [isWethAdjusted, setIsWethAdjusted] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -129,6 +144,15 @@ function App() {
               ))}
             </select>
           </div>
+          <div className="weth-adjustment">
+            <input
+              type="checkbox"
+              id="weth-adjusted"
+              checked={isWethAdjusted}
+              onChange={(e) => setIsWethAdjusted(e.target.checked)}
+            />
+            <label htmlFor="weth-adjusted">WETH Price Adjusted</label>
+          </div>
         </div>
         <div className="chart-container">
           {isLoading ? (
@@ -136,9 +160,9 @@ function App() {
           ) : error ? (
             <div className="error-message">{error}</div>
           ) : selectedView === 'Aggregate' && aggregateChartData ? (
-            <AggregateChart data={aggregateChartData} />
+            <AggregateChart data={aggregateChartData} isWethAdjusted={isWethAdjusted} />
           ) : filteredComposedChartData ? (
-            <ComposedChartComponent data={filteredComposedChartData} />
+            <ComposedChartComponent data={filteredComposedChartData} isWethAdjusted={isWethAdjusted}/>
           ) : (
             <div>No data available</div>
           )}
