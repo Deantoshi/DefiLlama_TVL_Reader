@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Bungee&display=swap');
+
 /* Root and body styles */
 #root, body {
   width: 100%;
@@ -161,7 +163,28 @@
 }
 
 .App-header {
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 0;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.superfest-logo {
+  height: 27px; /* Adjust this value to match your desired logo size */
+  width: auto;
+}
+
+.App-header h1 {
+  font-family: 'Bungee', cursive;
+  font-size: 32px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .tooltipStyle {

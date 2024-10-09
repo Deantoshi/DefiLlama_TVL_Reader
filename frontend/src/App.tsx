@@ -5,8 +5,9 @@ import axios from 'axios';
 import ComposedChartComponent from './ComboChart1';
 import LoadingAnimation from './LoadingAnimation';
 import AggregateChart from './AggregateChart';
+import superfestLogo from '/public/SuperfestLogo.svg';
 
-const api_url = 'http://localhost:8000';
+const api_url = 'https://superfest-api-dot-internal-website-427620.uc.r.appspot.com';
 
 // Custom X logo component
 const XLogo = ({ size = 24, color = 'currentColor' }) => (
@@ -127,9 +128,12 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <h1>Superfest Analytics Dashboard</h1>
-      </header>
+    <header className="App-header">
+      <div className="header-content">
+      <img src={superfestLogo} alt="Superfest Logo" className="superfest-logo" style={{filter: 'brightness(0) invert(1)'}} />
+        <h1>Analytics Dashboard</h1>
+      </div>
+    </header>
       <main className="main-content">
         <div className="protocol-selector-container">
           <div className="protocol-selector">
