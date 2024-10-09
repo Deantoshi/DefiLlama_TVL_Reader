@@ -69,7 +69,7 @@ const formatPercentage = (value: number): string => {
   } else if (absValue >= 1000) {
     return `${(value / 1000).toFixed(1)}k%`;
   }
-  return `${value.toFixed(2)}%`;
+  return `${value.toFixed(1)}%`;
 };
 
 const formatTooltipPercentage = (value: number): string => {
