@@ -817,6 +817,45 @@ def clean_up_bad_data_protocols(df):
 
     return df
 
+# # does same calculation as our aggregate for each pool
+def calculate_individual_protocol_incentive_roi(df):
+
+    df_list = []
+
+    unique_protocol_list = df['protocol'].unique()
+
+    for unique_protocol in unique_protocol_list:
+        temp_df = df.loc[df['protocol'] == unique_protocol]
+        unique_protocol_token_list = temp_df['token'].unique()
+
+        for unique_token in unique_protocol_token_list:
+            temp_df = temp_df.loc[temp_df['token'] == unique_token]
+
+            unique_pool_type_list = temp_df['pool_type'].unique()
+
+            for unique_pool in unique_pool_type_list:
+                temp_df = temp_df.loc[temp_df['pool_type'] == unique_pool]
+
+                unique_chain_list = temp_df['chain'].unique()
+
+                for unique_chain in unique_chain_list:
+                    temp_df = temp_df.loc[temp_df['chain'] == unique_chain]
+
+                    temp_df = temp_df.sort_values(['date'], ascending=True)
+
+                    temp_df['cumulative_incentives_usd'] = temp_df['incentives_per_day_usd'].cumsum()
+
+                    print(temp_df)
+                    df_list.append(temp_df)
+    
+    df = pd.concat(df_list)
+    # df = df.sort_values(['protocol', 'token', 'pool_type', 'chain', 'date'])  # Assuming you have a 'date' column
+    # df['cumulative_incentives_usd'] = df.groupby(['protocol', 'token', 'pool_type', 'chain'])['incentives_per_day_usd'].cumsum()
+
+    df['tvl_to_incentive_roi_percentage'] = df['raw_change_in_usd'] / df['cumulative_incentives_usd']
+
+    return df
+
 @app.route('/api/update_data', methods=['GET'])
 @limiter.limit("100 per hour")  # Adjust this limit as needed
 def run_all():
@@ -920,13 +959,12 @@ def run_all():
     merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
 
 
-    print(len(merged_df))
     merged_df = merged_df.drop_duplicates(subset=['date', 'chain', 'token', 'pool_type', 'protocol'])
-    print(len(merged_df))
 
     merged_df = clean_up_bad_data_protocols(merged_df)
 
     # merged_df = fix_protocol_segments(merged_df)
+    merged_df = calculate_individual_protocol_incentive_roi(merged_df)
 
     aggregate_df = get_aggregate_top_level_df(merged_df)
 
@@ -1035,7 +1073,7 @@ if __name__ == '__main__':
 # end_time = time.time()
 # print('Finished in: ', end_time - start_time)
 
-# df = cs.read_zip_csv_from_cloud_storage(CLOUD_AGGREGATE_FILENAME, CLOUD_BUCKET_NAME)
+# df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
 # df = get_aggregate_top_level_df(df)
 # df = df.loc[df['protocol'] == 'aave-v3']
 # print(df)
