@@ -970,6 +970,13 @@ def run_all():
 
     merged_df = calculate_individual_protocol_incentive_roi(merged_df)
 
+    aggregate_df = aggregate_df.fillna(0)
+    
+    merged_df = merged_df.fillna(0)
+
+    aggregate_df = aggregate_df.replace([np.inf, -np.inf], 0)
+    merged_df = merged_df.replace([np.inf, -np.inf], 0)
+
     cs.df_write_to_cloud_storage_as_zip(merged_df, CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
 
     cs.df_write_to_cloud_storage_as_zip(aggregate_df, CLOUD_AGGREGATE_FILENAME, CLOUD_BUCKET_NAME)
@@ -1005,7 +1012,7 @@ def get_pool_tvl_incentives_and_change_in_weth_price():
     incentive_combo_list = get_incentive_combo_list()
     df = df[df['combo_name'].isin(incentive_combo_list)]
     
-    columns_to_keep = ['date', 'chain', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage']
+    columns_to_keep = ['date', 'chain', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage', 'tvl_to_incentive_roi_percentage']
     df = df[columns_to_keep]
     
     # Convert 'date' column to datetime, sort, and format to ISO 8601

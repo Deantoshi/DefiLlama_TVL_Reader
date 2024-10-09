@@ -6,7 +6,7 @@ import ComposedChartComponent from './ComboChart1';
 import LoadingAnimation from './LoadingAnimation';
 import AggregateChart from './AggregateChart';
 
-const api_url = 'http://localhost:8000';
+const api_url = 'https://superfest-api-dot-internal-website-427620.uc.r.appspot.com';
 
 // Custom X logo component
 const XLogo = ({ size = 24, color = 'currentColor' }) => (
@@ -23,6 +23,7 @@ interface ComposedChartData {
     incentives_per_day_usd: number;
     weth_change_in_price_percentage: number;
     percentage_change_in_usd: number;
+    tvl_to_incentive_roi_percentage: number;
   }[];
 }
 
@@ -34,6 +35,7 @@ interface ChartData {
   percentage_change_in_usd: number;
   weth_change_in_price_percentage: number;
   tvl_to_incentive_roi_percentage: number;
+  incentives_per_day_usd: number;
 }
 
 interface AggregateChartData {
@@ -146,7 +148,7 @@ function App() {
         <div className="footer-content">
           <p className="footer-note">* Only pools that were integrated with <a href="https://defillama.com/" target="_blank" rel="noopener noreferrer">DefiLlama</a> prior to Superfest are tracked</p>
           <p className="footer-note">
-            * Non tracked pool information can be found <a href="https://docs.google.com/spreadsheets/d/1EORb1GByJMWBlppYFHSHAdVXJODNzQSSDsaHhtdcCU4/edit?gid=0#gid=0" target="_blank" rel="noopener noreferrer">here</a>
+            * Information on pools that are not tracked can be viewed <a href="https://docs.google.com/spreadsheets/d/1EORb1GByJMWBlppYFHSHAdVXJODNzQSSDsaHhtdcCU4/edit?gid=0#gid=0" target="_blank" rel="noopener noreferrer">here</a>
           </p>
           <a 
             href="https://twitter.com/0xDeantoshi" 

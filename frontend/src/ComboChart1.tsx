@@ -8,6 +8,7 @@ interface ChartData {
   incentives_per_day_usd: number;
   weth_change_in_price_percentage: number;
   percentage_change_in_usd: number;
+  tvl_to_incentive_roi_percentage: number;
 }
 
 interface ChartProps {
@@ -87,7 +88,8 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
     raw_change_in_usd: true,
     incentives_per_day_usd: true,
     weth_change_in_price_percentage: true,
-    percentage_change_in_usd: true
+    percentage_change_in_usd: true,
+    tvl_to_incentive_roi_percentage: true
   });
 
   const processedData = useMemo(() => {
@@ -108,7 +110,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
   }, [visibleLines]);
 
   const leftYAxisDomain = useMemo(() => {
-    const domains = ['token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd']
+    const domains = ['token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd', 'tvl_to_incentive_roi_percentage']
       .map(key => calculateYAxisDomain(processedData, key as keyof VisibleLines));
     return [
       Math.min(...domains.map(d => d[0])),
@@ -136,6 +138,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
     { dataKey: 'token_usd_amount', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e8dab2", name: "Pool TVL" } },
     { dataKey: 'raw_change_in_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#82ca9d", name: "Pool Change Since Start" } },
     { dataKey: 'incentives_per_day_usd', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#e24343", name: "OP Incentives per Day" } },
+    { dataKey: 'tvl_to_incentive_roi_percentage', Component: Bar, props: { yAxisId: "left", stackId: "a", fill: "#4CAF50", name: "TVL Change per USD Incentivized"} },
     { dataKey: 'weth_change_in_price_percentage', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#945bd6", name: "WETH Price Change Since Start", dot: false, strokeWidth: 3 } },
     { dataKey: 'percentage_change_in_usd', Component: Line, props: { yAxisId: "right", type: "monotone", stroke: "#F7931A", name: "TVL Change Since Start", dot: false, strokeWidth: 3 } },
   ];
@@ -206,6 +209,7 @@ const SingleChart: React.FC<{ data: ChartData[]; title: string }> = ({ data, tit
                 case "Pool TVL":
                 case "Pool Change Since Start":
                 case "OP Incentives per Day":
+                case "TVL Change per USD Incentivized":
                   return [formatCurrency(Number(value)), name];
                 default:
                   return [value, name];
