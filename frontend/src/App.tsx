@@ -5,7 +5,7 @@ import axios from 'axios';
 import ComposedChartComponent from './ComboChart1';
 import LoadingAnimation from './LoadingAnimation';
 import AggregateChart from './AggregateChart';
-import superfestLogo from '/public/SuperfestLogo.svg';
+import superfestLogo from '/SuperfestLogo.svg';
 
 const api_url = 'https://superfest-api-dot-internal-website-427620.uc.r.appspot.com';
 
