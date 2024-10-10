@@ -131,20 +131,17 @@ interface CustomLegendProps {
 
     const processedData = useMemo(() => {
       const dataArray = Array.isArray(data) ? data : [data];
-      const filteredData = dataArray
+      return dataArray
         .filter(item => !isNaN(new Date(item.date).getTime()))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-      const dataWithoutLatest = filteredData.slice(0, -1);
-    
-      return dataWithoutLatest.map(item => ({
-        ...item,
-        percentage_change_in_usd: item.percentage_change_in_usd * 100,
-        weth_change_in_price_percentage: item.weth_change_in_price_percentage * 100,
-        tvl_to_incentive_roi_percentage: item.tvl_to_incentive_roi_percentage,
-        adjusted_percentage_change_in_usd: item.adjusted_percentage_change_in_usd * 100,
-        adjusted_tvl_to_incentive_roi_percentage: item.adjusted_tvl_to_incentive_roi_percentage,
-      }));
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map(item => ({
+          ...item,
+          percentage_change_in_usd: item.percentage_change_in_usd * 100,
+          weth_change_in_price_percentage: item.weth_change_in_price_percentage * 100,
+          tvl_to_incentive_roi_percentage: item.tvl_to_incentive_roi_percentage,
+          adjusted_percentage_change_in_usd: item.adjusted_percentage_change_in_usd * 100,
+          adjusted_tvl_to_incentive_roi_percentage: item.adjusted_tvl_to_incentive_roi_percentage,
+        }));
     }, [data]);
 
   const calculateYAxisDomain = useCallback((data: ChartData[], key: keyof VisibleLines) => {
