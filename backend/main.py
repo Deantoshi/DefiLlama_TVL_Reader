@@ -281,10 +281,8 @@ def get_pool_type_df(data, protocol_blockchain, pool_type):
     
 
     elif pool_type == 'AMM' or pool_type == 'Yield_Vault' or pool_type == 'Lending':
-        if pool_type == 'Yield_Vault':
-            print('Yield')
-            print(type(data))
-            print(data)
+        # if pool_type == 'Yield_Vault':
+        #     print('Yield')
     
         category = 'tokensInUsd'
         df = get_historic_dex_tvl_df(data)
@@ -441,6 +439,8 @@ def find_tvl_over_time(df):
     return df
 
 # # will only return rows for tokens specified in our protocol_pool.csv file for our desired protocol
+# # will onlry return pool_types that are specified in our protocol_pool.csv
+# # then drops duplicate dates
 def df_token_cleanup(protocol_df, df):
 
     unique_slugs = protocol_df['protocol_slug'].unique()
@@ -448,13 +448,20 @@ def df_token_cleanup(protocol_df, df):
     df_list = []
 
     for unique_slug in unique_slugs:
-        temp_df = df.loc[df['protocol'] == unique_slug]
-        temp_protocol_df = protocol_df.loc[protocol_df['protocol_slug'] == unique_slug]
-        unique_protocol_tokens = temp_protocol_df['token'].unique()
+        temp_config_df = protocol_df.loc[protocol_df['protocol_slug'] == unique_slug]
 
-        temp_df = temp_df.loc[temp_df['token'].isin(unique_protocol_tokens)]
+        unique_tokens = temp_config_df['token'].unique()
 
-        df_list.append(temp_df)
+        for token in unique_tokens:
+            temp_temp_config_df = temp_config_df.loc[temp_config_df['token'] == token]
+
+            unique_pool_types = temp_temp_config_df['pool_type'].unique()
+
+            for unique_pool in unique_pool_types:
+                temp_df = df.loc[(df['protocol'] == unique_slug) & (df['token'] == token)  & (df['pool_type'] == unique_pool)]
+
+                if len(temp_df) > 0:
+                    df_list.append(temp_df)
 
     df = pd.concat(df_list)
 
@@ -857,6 +864,34 @@ def calculate_individual_protocol_incentive_roi(df):
 
     return df
 
+# # will make a dataframe that is WETH price adjusted
+def get_weth_adjusted_df(df):
+    df[['token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'daily_tvl', 'op_price', 'incentives_per_day_usd', 'weth_price', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage', 'cumulative_incentives_usd', 'tvl_to_incentive_roi_percentage']] = df[['token_usd_amount', 'start_token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'daily_tvl', 'op_price', 'incentives_per_day_usd', 'weth_price', 'weth_start_price', 'weth_change_in_price_usd', 'weth_change_in_price_percentage', 'cumulative_incentives_usd', 'tvl_to_incentive_roi_percentage']].astype(float)
+    
+    # # if ETH went up in price then we make the adjustment negative
+    # # if ETH went down in price then we make the adjustment positive
+    df['temp_weth_price_adjusted_multiplier'] = df['weth_change_in_price_percentage'] * -1
+
+    # # we add 1 to allow for easy multiplication
+    df['temp_weth_price_adjusted_multiplier'] = df['temp_weth_price_adjusted_multiplier'] + 1
+
+    # token_usd_amount: number;
+    # raw_change_in_usd: number;
+    # incentives_per_day_usd: number;
+    # weth_change_in_price_percentage: number;
+    # percentage_change_in_usd: number;
+    # tvl_to_incentive_roi_percentage: number;
+
+    adjustment_column_list = ['token_usd_amount', 'raw_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage', 'percentage_change_in_usd', 'tvl_to_incentive_roi_percentage']
+
+    # # we essentially multiply each respective column by its weth_adjustment multiplier and make it a new column
+    for adjustment_column in adjustment_column_list:
+        new_column_name = 'adjusted_' + adjustment_column
+        
+        df[new_column_name] = df[adjustment_column] * df['temp_weth_price_adjusted_multiplier']
+
+    return df
+
 @app.route('/api/update_data', methods=['GET'])
 @limiter.limit("100 per hour")  # Adjust this limit as needed
 def run_all():
@@ -914,8 +949,6 @@ def run_all():
 
         # if last_pool_type != pool_type:
         df = get_pool_type_df(data, protocol_blockchain, pool_type)
-        # print(df)
-        # df.to_csv('test_test.csv', index=False)
         df = filter_start_timestamp(df, start_unix)
         df['pool_type'] = pool_type
         if pool_type != 'AMM':
@@ -934,6 +967,12 @@ def run_all():
 
         df['protocol'] = protocol_slug
         df['chain'] = chain
+        
+        # # trying to cleanup token dataframes closer to the source
+        df = df_token_cleanup(protocol_df, df)
+        
+        # # tries to thin out data where each day only has one datapoint for this combo
+        df = df.drop_duplicates(subset=['date', 'chain', 'token', 'pool_type', 'protocol'], keep='last')
 
         df_list.append(df)
         
@@ -948,7 +987,10 @@ def run_all():
 
     df = pd.concat(df_list)
 
-    df = df_token_cleanup(protocol_df, df)
+    # # tries to thin out data where each day only has one datapoint for this combo
+    df = df.drop_duplicates(subset=['date', 'chain', 'token', 'pool_type', 'protocol'], keep='last')
+
+    # df = df_token_cleanup(protocol_df, df)
     incentive_df = get_incentive_df()
     df = combine_incentives_with_tvl(df, incentive_df)
 
@@ -958,7 +1000,6 @@ def run_all():
     df = get_weth_price_change_since_start(df)
 
     merged_df = merge_tvl_and_weth_dfs(tvl_df, df)
-
 
     merged_df = merged_df.drop_duplicates(subset=['date', 'chain', 'token', 'pool_type', 'protocol'])
 
@@ -976,6 +1017,15 @@ def run_all():
 
     aggregate_df = aggregate_df.replace([np.inf, -np.inf], 0)
     merged_df = merged_df.replace([np.inf, -np.inf], 0)
+
+    # # adds columns for our weth_price_adjustment
+    aggregate_df = get_weth_adjusted_df(aggregate_df)
+    merged_df = get_weth_adjusted_df(merged_df)
+
+    # # to help weed out the any days that haven't been indexed yet
+    aggregate_df = aggregate_df.loc[aggregate_df['raw_change_in_usd'] >= 0]
+    # aggregate_df = aggregate_df.loc[aggregate_df['date'] <= '2024-10-07']
+    # merged_df = merged_df.loc[merged_df['timestamp'] <= 1728345600]
 
     cs.df_write_to_cloud_storage_as_zip(merged_df, CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
 
@@ -1012,8 +1062,7 @@ def get_pool_tvl_incentives_and_change_in_weth_price():
     incentive_combo_list = get_incentive_combo_list()
     df = df[df['combo_name'].isin(incentive_combo_list)]
     
-    columns_to_keep = ['date', 'chain', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage', 'tvl_to_incentive_roi_percentage',
-    'adjusted_token_usd_amount', 'adjusted_raw_change_in_usd', 'adjusted_incentives_per_day_usd', 'adjusted_weth_change_in_price_percentage', 'adjusted_percentage_change_in_usd', 'adjusted_tvl_to_incentive_roi_percentage']
+    columns_to_keep = ['date', 'chain', 'protocol', 'token', 'pool_type', 'token_usd_amount', 'raw_change_in_usd', 'percentage_change_in_usd', 'incentives_per_day_usd', 'weth_change_in_price_percentage', 'tvl_to_incentive_roi_percentage']
     df = df[columns_to_keep]
     
     # Convert 'date' column to datetime, sort, and format to ISO 8601
@@ -1083,7 +1132,7 @@ if __name__ == '__main__':
 # end_time = time.time()
 # print('Finished in: ', end_time - start_time)
 
-# df = cs.read_zip_csv_from_cloud_storage(CLOUD_DATA_FILENAME, CLOUD_BUCKET_NAME)
+# df = cs.read_zip_csv_from_cloud_storage(CLOUD_AGGREGATE_FILENAME, CLOUD_BUCKET_NAME)
 # df = get_aggregate_top_level_df(df)
 # df = df.loc[df['protocol'] == 'aave-v3']
 # print(df)
